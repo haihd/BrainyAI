@@ -5,9 +5,11 @@ import Layout from "~options/layout";
 import OptionsProvider from "~provider/Options";
 import {Fragment, useContext, useEffect} from "react";
 import {GoogleAnalyticsContext} from "~provider/GoogleAnalyticsProvider";
+import ApiKeyPage from "~options/pages/ApiKeyPage";
 
 export const PATH_SETTING_SIDEBAR = "path_shortcut";
 export const PATH_SETTING_CONTACT_US = "path_contact_us";
+export const PATH_SETTING_APIKEY = "path_apikey";
 export const PATH_SETTING_SHORTCUT = "";
 
 const Wrapper = ({children}) => {
@@ -41,6 +43,10 @@ export const router = createBrowserRouter([
             {
                 path: PATH_SETTING_SHORTCUT,
                 element: <ShortcutMenu/>,
+            },
+            {
+                path: PATH_SETTING_APIKEY,
+                element: <ApiKeyPage/>,
             },
         ],
     },

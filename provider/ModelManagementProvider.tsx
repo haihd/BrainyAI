@@ -15,6 +15,8 @@ import  ChatGPT4Turbo from "~libs/chatbot/openai/ChatGPT4Turbo";
 import {Logger} from "~utils/logger";
 import ChatGPT4O from "~libs/chatbot/openai/ChatGPT4o";
 import ArkoseGlobalSingleton from "~libs/chatbot/openai/Arkose";
+import ChatGPT4oMiniAPI from "~libs/chatbot/openai/ChatGPT4o-miniAPI";
+import OllamaAPI from "~libs/chatbot/openai/OllamaAPI";
 
 export type M = (
     typeof ChatGPT35Turbo
@@ -29,6 +31,8 @@ export type M = (
     | typeof Llama3SonarLarge32kOnline
     | typeof ChatGPT4Turbo
     | typeof ChatGPT4O
+    | typeof ChatGPT4oMiniAPI
+    | typeof OllamaAPI
     )
 
 export type Ms = M[]
@@ -50,7 +54,7 @@ interface IModelManagementProvider {
 export const ModelManagementContext = createContext({} as IModelManagementProvider);
 
 export default function ModelManagementProvider({children}) {
-    const defaultModels: Ms = [ChatGPT35Turbo, CopilotBot, KimiBot];
+    const defaultModels: Ms = [ChatGPT4oMiniAPI, CopilotBot];
     const [currentBots, setCurrentBots] = useState<IModelManagementProvider['currentBots']>(defaultModels);
     const allModels = useRef<Ms>([Llama3SonarLarge32KChat, Llama3SonarLarge32kOnline, Claude3Haiku, ChatGPT35Turbo, ChatGPT4O, ChatGPT4Turbo, CopilotBot, KimiBot, Llama370bInstruct, Gemma7bIt, Llavav1634b, Mistral822b]);
     const storage = new Storage();
@@ -71,6 +75,10 @@ export default function ModelManagementProvider({children}) {
         {
             label: "Perplexity",
             models: [Llama3SonarLarge32KChat, Llama3SonarLarge32kOnline, Claude3Haiku, Llama370bInstruct, Gemma7bIt, Llavav1634b, Mistral822b]
+        },
+        {
+            label: "API models",
+            models: [ChatGPT4oMiniAPI, OllamaAPI]
         }]
     );
 
