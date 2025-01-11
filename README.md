@@ -8,8 +8,6 @@ Based on BrainAI project, modified API calls to be API Key based (gpt-4o-mini) a
 
 ![alt text](misc/ollama-1.png) 
 
-![alt text](misc/ollama-2.png)
-
 ## For developers
 
 ### Getting started
@@ -59,6 +57,9 @@ For further guidance, [visit plasmo Documentation](https://docs.plasmo.com/)
     ]
 }
 ```
+
+### Ollama setting
+If there is 403 error happen, let start Ollama with option: `OLLAMA_ORIGINS=* ollama serve`
 
 ### Making production build
 
