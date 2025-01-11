@@ -49,7 +49,7 @@ export default function Layout() {
                     onClick={() => handleClick({id: 'ApiKey', path: PATH_SETTING_APIKEY})}
                     imageSrc={IconApiKey} 
                     imageSrcSelected={IconApiKeySelected}
-                    text={'API Key'} 
+                    text={'API Key & Ollama'} 
                     className={'mt-[24px]'}
                     isSelected={selected === 'ApiKey'}
                 />

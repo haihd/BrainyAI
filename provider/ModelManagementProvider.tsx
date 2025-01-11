@@ -54,7 +54,7 @@ interface IModelManagementProvider {
 export const ModelManagementContext = createContext({} as IModelManagementProvider);
 
 export default function ModelManagementProvider({children}) {
-    const defaultModels: Ms = [ChatGPT4oMiniAPI, CopilotBot];
+    const defaultModels: Ms = [OllamaAPI];
     const [currentBots, setCurrentBots] = useState<IModelManagementProvider['currentBots']>(defaultModels);
     const allModels = useRef<Ms>([Llama3SonarLarge32KChat, Llama3SonarLarge32kOnline, Claude3Haiku, ChatGPT35Turbo, ChatGPT4O, ChatGPT4Turbo, CopilotBot, KimiBot, Llama370bInstruct, Gemma7bIt, Llavav1634b, Mistral822b]);
     const storage = new Storage();
@@ -62,7 +62,7 @@ export default function ModelManagementProvider({children}) {
     const categoryModels = useRef<CMs>([
         {
             label: "OpenAI",
-            models: [ChatGPT35Turbo, ChatGPT4Turbo, ChatGPT4O]
+            models: [ChatGPT4oMiniAPI, ChatGPT35Turbo, ChatGPT4Turbo, ChatGPT4O]
         },
         {
             label: "Microsoft",
@@ -77,8 +77,8 @@ export default function ModelManagementProvider({children}) {
             models: [Llama3SonarLarge32KChat, Llama3SonarLarge32kOnline, Claude3Haiku, Llama370bInstruct, Gemma7bIt, Llavav1634b, Mistral822b]
         },
         {
-            label: "API models",
-            models: [ChatGPT4oMiniAPI, OllamaAPI]
+            label: "Local",
+            models: [OllamaAPI]
         }]
     );
 

@@ -1,75 +1,78 @@
-
 export const items = [
     {
         label: 'English',
         key: '1',
     },
     {
-        label: '简体中文',
+        label: 'Vietnamese',
         key: '2',
     },
     {
-        label: '繁體中文',
+        label: '日本語',
         key: '3',
     },
     {
-        label: 'Español',
+        label: '简体中文',
         key: '4',
     },
     {
-        label: 'Français',
+        label: '繁體中文',
         key: '5',
     },
     {
-        label: '日本語',
+        label: 'Español',
         key: '6',
     },
     {
-        label: 'Indonesia',
+        label: 'Français',
         key: '7',
     },
     {
-        label: 'ภาษาไทย',
+        label: 'Indonesia',
         key: '8',
     },
     {
-        label: 'Bahasa Melayu',
+        label: 'ภาษาไทย',
         key: '9',
     },
     {
-        label: 'Deutsch',
+        label: 'Bahasa Melayu',
         key: '10',
     },
     {
-        label: 'Português',
+        label: 'Deutsch',
         key: '11',
     },
     {
-        label: 'العربية',
+        label: 'Português',
         key: '12',
     },
     {
-        label: 'Русский',
+        label: 'العربية',
         key: '13',
     },
     {
-        label: 'Italiano',
+        label: 'Русский',
         key: '14',
     },
     {
-        label: '한국어',
+        label: 'Italiano',
         key: '15',
     },
     {
-        label: 'हिन्दी',
+        label: '한국어',
         key: '16',
     },
     {
-        label: 'Nederlands',
+        label: 'हिन्दी',
         key: '17',
     },
     {
-        label: 'Polski',
+        label: 'Nederlands',
         key: '18',
+    },
+    {
+        label: 'Polski',
+        key: '19',
     },
 ];

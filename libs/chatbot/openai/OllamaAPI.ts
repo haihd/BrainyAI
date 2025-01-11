@@ -60,12 +60,23 @@ class OllamaAPISessionSingleton {
 const modelSlug = "ollama";
 
 export default class OllamaAPI extends OpenaiBot {
-    static botName = 'ollama-api';
+    static botName = 'ollama';
+    // static loginUrl = 'https://ollama.com';
     model = modelSlug;
     static requireLogin = false;
-    static desc = 'Ollama API';
-    static maxTokenLimit = 2000;
+    static desc = 'Ollama';
+    static maxTokenLimit = 32000;
     supportedUploadTypes = [BotSupportedMimeType.TXT];
+    static get supportUploadPDF() {
+        return false;
+    }
+    static get supportUploadImage() {
+        return false;
+    }
+
+    static get loginUrl() {
+        return 'https://ollama.coms';
+    }
 
     constructor(params: BotConstructorParams) {
         super(params);
@@ -79,30 +90,48 @@ export default class OllamaAPI extends OpenaiBot {
         }
     }
 
+    static async checkIsLogin(): Promise<[ChatError | null, boolean]> {
+        const storage = new Storage();
+        const ollamaUrl = await storage.get('ollama-url');
+        const response = await fetch(ollamaUrl + '/api/version', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Origin': 'http://localhost',
+            }
+        });
+
+        if (!response.ok) {
+            return Promise.resolve([null, true]);
+        }
+
+        return Promise.resolve([null, false]);
+    }
+
     async completion({prompt, rid, cb, fileRef, file}: BotCompletionParams): Promise<void> {
         try {
             const storage = new Storage();
-            const ollamaSettingString = await storage.get('ollama-setting');
+            const ollamaUrl = await storage.get('ollama-url');
+            const ollamaModel = await storage.get('ollama-model');
             
-            if (!ollamaSettingString) {
+            if (!ollamaUrl || !ollamaModel) {
                 throw new ChatError(ErrorCode.MODEL_INTERNAL_ERROR, 'Ollama setting is not set.');
             }
 
-            const ollamaSetting = JSON.parse(ollamaSettingString);
             console.log('completion api called with prompt:', prompt);
-            const response = await fetch(ollamaSetting.url, {
+            const response = await fetch(ollamaUrl + '/api/chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    // 'Authorization': `Bearer ${apiKey}`
+                    'Origin': 'http://localhost',
                 },
                 body: JSON.stringify({
-                    model: ollamaSetting.model,
+                    model: ollamaModel,
                     messages: [{
                         role: 'user',
                         content: prompt
                     }],
-                    stream: true
+                    stream: false
                 })
             });
 
@@ -112,46 +141,30 @@ export default class OllamaAPI extends OpenaiBot {
             }
 
             let messageText = '';
-            let messageId = '';
+            let messageId = createUuid();
 
-            const reader = response.body?.getReader();
-            const decoder = new TextDecoder();
-            let buffer = '';
+            const result = await response.json();
+            Logger.log("Response:", result);
 
-            while (true) {
-                const {value, done} = await reader?.read() || {};
-                if (done) break;
+            try {
+                messageText = result.message.content;
 
-                buffer += decoder.decode(value, {stream: true});
-                const lines = buffer.split('\n');
-                buffer = lines.pop() || '';
-
-                for (const line of lines) {
-                    if (line.startsWith('data: ')) {
-                        const data = line.slice(6);
-                        if (data === '[DONE]') continue;
-
-                        try {
-                            const json = JSON.parse(data);
-                            const content = json.choices[0]?.delta?.content || '';
-                            messageText += content;
-                            messageId = json.id;
-
-                            Logger.log("Response:", json);
-                            cb(rid, new ConversationResponse({
-                                conversation_id: this.botSession.session.botConversationId,
-                                message_type: ResponseMessageType.GENERATING,
-                                message_text: messageText,
-                                message_id: messageId,
-                                parent_message_id: this.botSession.session.getParentMessageId()
-                            }));
-                        } catch (e) {
-                            Logger.error('Failed to parse JSON:', e);
-                            throw new ChatError(ErrorCode.MODEL_INTERNAL_ERROR, 'JSON 파싱 오류');
-                        }
-                    }
+                if (!messageText) {
+                    throw new ChatError(ErrorCode.MODEL_INTERNAL_ERROR, 'No response text received.');
                 }
+                
+            } catch (parseError) {
+                Logger.error('Response parsing error:', parseError);
+                throw new ChatError(ErrorCode.MODEL_INTERNAL_ERROR, 'An error occurred while parsing the response.');
             }
+
+            cb(rid, new ConversationResponse({
+                conversation_id: this.botSession.session.botConversationId,
+                message_type: ResponseMessageType.GENERATING,
+                message_text: messageText,
+                message_id: messageId,
+                parent_message_id: this.botSession.session.getParentMessageId()
+            }));
 
             this.botSession.session.addMessage(new SimpleBotMessage(messageText, messageId));
 
@@ -162,7 +175,6 @@ export default class OllamaAPI extends OpenaiBot {
                 message_id: messageId,
                 parent_message_id: this.botSession.session.getParentMessageId()
             }));
-
         } catch (error) {
             Logger.error('API Error:', error);
             cb(rid, new ConversationResponse({
@@ -188,4 +200,9 @@ export default class OllamaAPI extends OpenaiBot {
     uploadFile(file: File): Promise<string> {
         return this.fileInstance.uploadFile(file, this.supportedUploadTypes);
     }
-} 
+
+    getLoginUrl(): string {
+        return OllamaAPI.loginUrl;
+    }
+
+}
