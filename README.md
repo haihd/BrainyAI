@@ -14,9 +14,20 @@ Supported API providers (set the key and model in **Options → API Keys & Model
 The original website-login models (ChatGPT web, Microsoft Copilot, Kimi web, Perplexity Labs) are no longer
 shown: those sites changed their private APIs and the listed models were retired. Use the official APIs above instead.
 
+### Selection toolbar
+
+The toolbar that appears when you select text adapts to where the text is:
+
+- **Page text** (paragraphs, headings, ...): reading actions: Search, Translate, Summarize, Explain, Key points.
+- **Text fields** (inputs, textareas, rich-text editors): writing actions: Translate, Improve writing, Rephrase,
+  Grammar check, plus Make shorter and Professional tone in the dropdown. Password fields are ignored.
+
+In **Options → Shortcut Menu** each shortcut, including your own, has **Page text** / **Text fields** toggles for where
+it appears, and a pin toggle for whether it sits in the toolbar or in its dropdown.
+
 ### Turning BrainyAI off on a website
 
-Hover the selection quick bar and click the small × at its top-right corner, then choose
+Hover the selection quick bar and click the small × at its top-right corner, then choose from the menu that opens beside it:
 **Disable on this website** or **Disable on all websites**. On a disabled site BrainyAI shows nothing on the page
 (no quick bar, no page buttons, no ⌘/Ctrl+J ask box); the side panel still opens from the toolbar or ⌘/Ctrl+I.
 Turn it back on in **Options → Websites**, where you can also add or remove sites.

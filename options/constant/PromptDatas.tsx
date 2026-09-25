@@ -1,6 +1,12 @@
 import {PromptTypes} from "~options/constant/PromptTypes";
 import {PROMPT_PLACEHOLDER_LANG, PROMPT_PLACEHOLDER_TEXT} from "~utils";
+import {SelectionContexts} from "~options/constant/SelectionContexts";
 
+/**
+ * Built-in quick bar prompts. `contexts` decides where each one is offered:
+ * on selected page text (reading) and/or on text selected inside an input, textarea or editor (writing).
+ * `isSelect` pins it to the quick bar; unpinned prompts are in the bar's dropdown.
+ */
 export const PromptDatas = [
     {
         id: 1012,
@@ -9,7 +15,8 @@ export const PromptDatas = [
         title: 'Translate',
         language: 'English',
         isSelect: true,
-        text:`I would like you to translate the text delimited by triple quotes into ${PROMPT_PLACEHOLDER_LANG} language, ensuring that the translation is colloquial and authentic. Only give me the output and nothing else. Do not wrap responses in quotes. """ ${PROMPT_PLACEHOLDER_TEXT} """`,
+        contexts: [SelectionContexts.TEXT, SelectionContexts.EDITABLE],
+        text: `I would like you to translate the text delimited by triple quotes into ${PROMPT_PLACEHOLDER_LANG} language, ensuring that the translation is colloquial and authentic. Only give me the output and nothing else. Do not wrap responses in quotes. """ ${PROMPT_PLACEHOLDER_TEXT} """`,
     },
     {
         id: 1013,
@@ -18,6 +25,7 @@ export const PromptDatas = [
         title: 'Summarize',
         language: 'English',
         isSelect: true,
+        contexts: [SelectionContexts.TEXT],
         text: `Condense the following paragraph :${PROMPT_PLACEHOLDER_TEXT} .Please respond in ${PROMPT_PLACEHOLDER_LANG} .`,
     },
     {
@@ -27,7 +35,28 @@ export const PromptDatas = [
         title: 'Explain',
         language: 'English',
         isSelect: true,
+        contexts: [SelectionContexts.TEXT],
         text: `Clarify and explain the following paragraph :${PROMPT_PLACEHOLDER_TEXT} .Please respond in ${PROMPT_PLACEHOLDER_LANG} .`,
+    },
+    {
+        id: 1020,
+        itemType: PromptTypes.DEFAULT,
+        imageKey: 'Key_points',
+        title: 'Key points',
+        language: 'English',
+        isSelect: true,
+        contexts: [SelectionContexts.TEXT],
+        text: `List the key points of the following text as short bullet points: """ ${PROMPT_PLACEHOLDER_TEXT} """. Please respond in ${PROMPT_PLACEHOLDER_LANG}.`,
+    },
+    {
+        id: 1017,
+        itemType: PromptTypes.DEFAULT,
+        imageKey: 'Improve',
+        title: 'Improve writing',
+        language: 'English',
+        isSelect: true,
+        contexts: [SelectionContexts.EDITABLE],
+        text: `Improve the writing of the following text: make it clearer and more fluent while keeping its meaning and tone. Only give me the improved text. """ ${PROMPT_PLACEHOLDER_TEXT} """ Please respond in ${PROMPT_PLACEHOLDER_LANG}.`,
     },
     {
         id: 1015,
@@ -36,6 +65,7 @@ export const PromptDatas = [
         title: 'Rephrase',
         language: 'English',
         isSelect: true,
+        contexts: [SelectionContexts.EDITABLE],
         text: `Rephrase the following paragraph :${PROMPT_PLACEHOLDER_TEXT} .Please respond in ${PROMPT_PLACEHOLDER_LANG} , focusing on the core topic. `,
     },
     {
@@ -45,7 +75,28 @@ export const PromptDatas = [
         title: 'Grammar check',
         language: 'English',
         isSelect: true,
+        contexts: [SelectionContexts.EDITABLE],
         text: `Correct grammar mistakes, typos, and factual errors of the following paragraph :${PROMPT_PLACEHOLDER_TEXT} .Please respond in ${PROMPT_PLACEHOLDER_LANG} , focusing on the core topic. `,
+    },
+    {
+        id: 1018,
+        itemType: PromptTypes.DEFAULT,
+        imageKey: 'Shorten',
+        title: 'Make shorter',
+        language: 'English',
+        isSelect: false,
+        contexts: [SelectionContexts.EDITABLE],
+        text: `Make the following text shorter and more concise without losing important information. Only give me the shortened text. """ ${PROMPT_PLACEHOLDER_TEXT} """ Please respond in ${PROMPT_PLACEHOLDER_LANG}.`,
+    },
+    {
+        id: 1019,
+        itemType: PromptTypes.DEFAULT,
+        imageKey: 'Professional',
+        title: 'Professional tone',
+        language: 'English',
+        isSelect: false,
+        contexts: [SelectionContexts.EDITABLE],
+        text: `Rewrite the following text in a professional, polite tone. Only give me the rewritten text. """ ${PROMPT_PLACEHOLDER_TEXT} """ Please respond in ${PROMPT_PLACEHOLDER_LANG}.`,
     },
 ];
 export const AskPromptId = 100001;

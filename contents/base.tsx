@@ -2,7 +2,7 @@ import type {PlasmoCSConfig, PlasmoGetStyle} from "plasmo";
 import styleText from 'data-text:~base.scss';
 import baseContentStyleText from 'data-text:~style/base-content.module.scss';
 import * as baseContentStyle from '~style/base-content.module.scss';
-import React, {useEffect, useRef, useState} from "react";
+import React, {useEffect, useMemo, useRef, useState} from "react";
 import {
     getLatestState,
     MESSAGE_ACTION_SET_PANEL_OPEN_OR_NOT,
@@ -14,8 +14,6 @@ import {
 import Icon from "data-base64:~assets/icon.png";
 import AskEditIcon from "data-base64:~assets/icon_ask_content_edit.svg";
 import CTooltip from "~component/common/CTooltip";
-import {useStorage} from "@plasmohq/storage/dist/hook";
-import {PromptDatas} from "~options/constant/PromptDatas";
 import {Input, List, Popover} from "antd";
 import {PromptTypes} from "~options/constant/PromptTypes";
 import {getIconSrc} from "~options/component/AiEnginePage";
@@ -33,6 +31,8 @@ import {SearchBar} from "~options/component/SearchBar";
 import {Logger} from "~utils/logger";
 import {BASE_ZINDEX} from "~component/common/CPopover";
 import {disableSite, isSiteDisabled, setDisabledAllSites, useSiteAccess} from "~utils/site-access";
+import {cardShowsIn, usePromptCards} from "~utils/prompt-cards";
+import {SELECTION_CONTEXT_LABELS, type SelectionContext, SelectionContexts} from "~options/constant/SelectionContexts";
 
 export const getStyle: PlasmoGetStyle = () => {
     const style = document.createElement("style");
@@ -77,6 +77,58 @@ let pageDisabled = true;
 /** The "Hide BrainyAI" menu is open; clicks in it must not close the quick bar. */
 let disableMenuShown = false;
 
+// Input types whose text can be selected (password is deliberately excluded)
+const TEXT_INPUT_TYPES = new Set(['text', 'search', 'url', 'email', 'tel', '']);
+
+interface PageSelection {
+    text: string;
+    context: SelectionContext;
+    /** Viewport rectangle to place the quick bar under. */
+    anchor: { left: number, bottom: number };
+}
+
+/**
+ * Reads the current selection. Text selected inside <input>/<textarea> is not part of
+ * window.getSelection(), so it is read from the focused field instead.
+ */
+function readPageSelection(mouse?: MouseEvent): PageSelection | null {
+    const active = document.activeElement;
+    if (active instanceof HTMLInputElement && !TEXT_INPUT_TYPES.has(active.type)) {
+        // password, number, date... fields: never offer the quick bar
+        return null;
+    }
+    const isTextField = active instanceof HTMLTextAreaElement || active instanceof HTMLInputElement;
+
+    if (isTextField) {
+        const field = active as HTMLInputElement | HTMLTextAreaElement;
+        const {selectionStart, selectionEnd} = field;
+        if (selectionStart == null || selectionEnd == null || selectionEnd <= selectionStart) {
+            return null;
+        }
+        const text = field.value.slice(selectionStart, selectionEnd).trim();
+        const rect = field.getBoundingClientRect();
+        // There is no rectangle for text inside a field; use the pointer, else the field itself
+        const anchor = mouse
+            ? {left: mouse.clientX - 12, bottom: mouse.clientY + 6}
+            : {left: rect.left, bottom: rect.bottom};
+        return text ? {text, context: SelectionContexts.EDITABLE, anchor} : null;
+    }
+
+    const selection = window.getSelection();
+    const text = selection?.toString().trim();
+    if (!selection || selection.isCollapsed || !text) {
+        return null;
+    }
+    const node = selection.anchorNode;
+    const element = node instanceof HTMLElement ? node : node?.parentElement;
+    const rect = selection.getRangeAt(0).getBoundingClientRect();
+    return {
+        text,
+        context: element?.isContentEditable ? SelectionContexts.EDITABLE : SelectionContexts.TEXT,
+        anchor: {left: rect.left, bottom: rect.bottom},
+    };
+}
+
 export default function Base() {
     const [toolPositions, setToolPositions] = useState([0, 0]); // [x, y]
     const [showTool, setShowTool] = useState(false);
@@ -91,7 +143,9 @@ export default function Base() {
      * quick bar Keyboard shortcuts is show?
      */
     const [visibleAsk, setVisibleAsk] = useState(false);
-    const [cards, setCards] = useStorage('promptData', PromptDatas);
+    const [cards, setCards] = usePromptCards();
+    const [selectionContext, setSelectionContext] = useState<SelectionContext>(SelectionContexts.TEXT);
+    const contextCards = useMemo(() => cards.filter(card => cardShowsIn(card, selectionContext)), [cards, selectionContext]);
     const [disableMenuOpen, setDisableMenuOpen] = useState(false);
     const [barHovered, setBarHovered] = useState(false);
     const siteAccess = useSiteAccess();
@@ -109,21 +163,19 @@ export default function Base() {
         }
     }, [disabledHere]);
 
-    function checkSelection() {
+    function checkSelection(mouse?: MouseEvent) {
         if (pageDisabled) {
             return;
         }
-        const selection = window.getSelection();
-        const selectionText = selection?.toString().trim();
+        const pageSelection = readPageSelection(mouse);
 
-        if (!selection?.isCollapsed && selectionText && selectionText.trim()){
-            Logger.log('selectionText================', selectionText);
+        if (pageSelection) {
+            const {text: selectionText, context, anchor} = pageSelection;
+            Logger.log('selectionText================', context, selectionText);
             setSelectedText(selectionText);
-            const range = selection?.getRangeAt(0);
+            setSelectionContext(context);
 
-            const rect = range?.getBoundingClientRect();
-
-            let x = (rect?.left ?? 0) + window.scrollX;
+            let x = anchor.left + window.scrollX;
 
             let toolTipWidth = 280;
 
@@ -135,7 +187,7 @@ export default function Base() {
                 x = window.innerWidth - toolTipWidth - 10;
             }
 
-            setToolPositions([x, (rect?.bottom ?? 0) + window.scrollY + 10]);
+            setToolPositions([Math.max(x, 0), anchor.bottom + window.scrollY + 10]);
             void chrome.runtime.sendMessage({action: MESSAGE_ACTION_SET_QUOTING_SELECTION_TEXT, data:selectionText});
             void showToolByConfig();
             setVisibleAsk(false);
@@ -299,9 +351,9 @@ export default function Base() {
         Logger.log('chrome.runtime.onMessage.addListener============');
         chrome.runtime.onMessage.addListener(handleMessage);
         if (!openInPlugin(location.href)) {
-            document.body.addEventListener('mouseup', () => {
+            document.body.addEventListener('mouseup', (e) => {
                 Logger.log(`mouseup ===============${showAskSearch}`);
-                setTimeout(() => checkSelection());
+                setTimeout(() => checkSelection(e));
             });
 
             document.body.addEventListener('mousedown', () => {
@@ -361,14 +413,17 @@ export default function Base() {
     const popupPrompt =  (
         <div className={baseContentStyle.popupPrompt}>
             <div className={baseContentStyle.header}>
-                <div className={baseContentStyle.title} >Shortcut Menu</div>
+                <div className={baseContentStyle.title} >
+                    Shortcut Menu
+                    {selectPopType == 1 && <span className={baseContentStyle.titleContext}> · {SELECTION_CONTEXT_LABELS[selectionContext]}</span>}
+                </div>
                 <img className={baseContentStyle.iconImage} src={popupSettingIcon} alt='' onClick={() => {
                     window.open(`chrome-extension://${chrome.runtime.id}/options.html`);
                 }}/>
             </div>
             <List
                 itemLayout="vertical"
-                dataSource={cards}
+                dataSource={selectPopType == 1 ? contextCards : cards}
                 bordered={false}
                 split={false}
                 className={`hideScrollBar ${baseContentStyle.listWrap}`}
@@ -446,9 +501,11 @@ export default function Base() {
     function setPromptIsDisplay(car: any, index: number,e: React.MouseEvent<HTMLImageElement>) {
         e.stopPropagation();
         Logger.log('setPromptIsDisplay===============', car, index);
+        // `index` is into the (possibly filtered) dropdown list, so look the prompt up by id
+        const cardIndex = cards.findIndex(card => card.id === car.id);
         void setCards(
             update(cards, {
-                [index]: {
+                [cardIndex]: {
                     isSelect: {$set: !car.isSelect},
                 },
             }),
@@ -509,7 +566,7 @@ export default function Base() {
                         <div className={"w-[1px] h-[14px] bg-[#000000] opacity-[.12] mx-[3px]"}></div>
                     </div>
                     <div >
-                        <SearchBar compact cards={cards} popupPrompt={popupPrompt} isVisible={visiblePop ?? false} onOpenChange={(visiblePopup) =>{
+                        <SearchBar compact cards={contextCards} showSearch={selectionContext === SelectionContexts.TEXT} popupPrompt={popupPrompt} isVisible={visiblePop ?? false} onOpenChange={(visiblePopup) =>{
                             if(visiblePopup) {
                                 selectPopType = 1;
                             }
@@ -533,7 +590,7 @@ export default function Base() {
 
                 </div>
                 <Popover zIndex={BASE_ZINDEX+100} overlayInnerStyle={{padding: '6px 0'}} title={null} content={disableMenu}
-                    arrow={false} placement='bottomRight' trigger='click' open={disableMenuOpen}
+                    arrow={false} placement='rightTop' align={{offset: [6, -4]}} trigger='click' open={disableMenuOpen}
                     onOpenChange={(open) => {
                         disableMenuShown = open;
                         setDisableMenuOpen(open);

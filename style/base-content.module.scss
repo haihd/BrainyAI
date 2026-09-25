@@ -13,6 +13,9 @@
     .title {
         @apply flex items-center text-gray-800 font-bold text-sm;
     }
+    .titleContext {
+        @apply ml-[4px] text-[#8C8C8C] font-[400] text-[12px];
+    }
 
     .iconImage {
         @apply w-[20px] h-[20px];

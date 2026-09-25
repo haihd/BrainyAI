@@ -7,6 +7,7 @@ import {getImageSrc} from "~options/component/Card";
 import {Popover} from "antd";
 import TriangleIcon from "data-base64:~assets/icon_triangle.svg";
 import {Logger} from "~utils/logger";
+import type {SelectionContext} from "~options/constant/SelectionContexts";
 export type PromptTypesType = typeof PromptTypes[keyof typeof PromptTypes];
 
 export interface Card {
@@ -17,6 +18,8 @@ export interface Card {
     language: string,
     isSelect: boolean,
     text: string,
+    /** Where the prompt is offered; missing on prompts saved by older versions (treated as everywhere). */
+    contexts?: SelectionContext[],
 }
 
 export interface SearchBarProps {
@@ -28,6 +31,8 @@ export interface SearchBarProps {
     onItemSearchClick: () => void
     /** Smaller buttons and hover labels, used by the quick bar shown on text selection. */
     compact?: boolean
+    /** Show the web Search button (not useful for text being written in a field). */
+    showSearch?: boolean
 }
 
 const tooltipStyle = {
@@ -39,7 +44,7 @@ const compactTooltipStyle = {...tooltipStyle, borderRadius: '6px'};
 const tooltipInnerStyle = {textAlign: 'center' as const};
 const compactTooltipInnerStyle = {textAlign: 'center' as const, minHeight: 'auto', padding: '3px 8px', fontSize: '12px', lineHeight: '18px', borderRadius: '6px'};
 
-export const SearchBar = ({ cards, popupPrompt,isVisible,onOpenChange,onItemClick,onItemSearchClick, compact = false}: SearchBarProps) => {
+export const SearchBar = ({ cards, popupPrompt,isVisible,onOpenChange,onItemClick,onItemSearchClick, compact = false, showSearch = true}: SearchBarProps) => {
     const buttonClass = compact
         ? 'flex w-[22px] h-[22px] rounded-[4px] justify-center items-center bg-white hover:bg-[#F2F5FF] cursor-pointer'
         : 'flex w-[28px] h-[28px] rounded-[4px] justify-center items-center bg-white hover:bg-[#F2F5FF]';
@@ -57,14 +62,15 @@ export const SearchBar = ({ cards, popupPrompt,isVisible,onOpenChange,onItemClic
         alignItems: 'center',
     }}>
         <div className={'flex flex-row justify-start max-w-[500px] overflow-x-auto overflow-y-hidden hideScrollBar'}>
+            {showSearch &&
             <CTooltip title='Search' {...tooltipProps}>
-                <div className={buttonClass}>
+                <div className={buttonClass} role="button" aria-label="Search">
                     <img style={{width: iconSize, height: iconSize}} className={'cursor-pointer'} src={newSearchIcon} alt=''
                         onClick={() => {
                             onItemSearchClick();
                         }}/>
                 </div>
-            </CTooltip>
+            </CTooltip>}
             {
                 cards.filter((card) => card.isSelect).map((car) => {
                     const ItemIcon = getIconSrc(car.imageKey);
@@ -72,6 +78,7 @@ export const SearchBar = ({ cards, popupPrompt,isVisible,onOpenChange,onItemClic
                         <CTooltip key={car.title} title={car.title} {...tooltipProps}>
                             <div
                                 className={`${buttonClass} ${compact ? 'ml-[1px]' : 'ml-[2px]'}`}
+                                role="button" aria-label={car.title}
                                 onClick={() => {
                                     onItemClick(car.id);
                                 }}>
