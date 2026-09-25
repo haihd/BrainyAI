@@ -77,15 +77,29 @@ export const openPanelSearchInContent = function (text: string) {
 export enum OpenPanelType {
     SEARCH = 'search',
     AI_ASK = 'ai_ask',
+    TRANSLATE = 'translate',
 }
+
+/** Text to show on the Translate page, e.g. from the selection toolbar's Translate button. */
+export interface IOpenTranslate {
+    text: string;
+    /** Target language name; when missing the Translate page's saved target is used. */
+    target?: string;
+    /** Distinguishes two requests with the same text, so each one is translated. */
+    requestId: number;
+}
+
+export const openPanelTranslate = function (text: string, target?: string) {
+    openPanel(OpenPanelType.TRANSLATE, {text, target, requestId: Date.now()});
+};
 
 export interface IOpenPanelData {
     openType: OpenPanelType;
-    data: IAskAi | string;
+    data: IAskAi | IOpenTranslate | string;
 }
 
 // when openType === search， data is string
-const openPanel = function (openType: OpenPanelType, data: IAskAi | string) {
+const openPanel = function (openType: OpenPanelType, data: IAskAi | IOpenTranslate | string) {
     const storage = new Storage();
 
     storage.set(STORAGE_OPEN_PANEL_INIT_DATA, {

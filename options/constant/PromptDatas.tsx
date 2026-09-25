@@ -2,6 +2,9 @@ import {PromptTypes} from "~options/constant/PromptTypes";
 import {PROMPT_PLACEHOLDER_LANG, PROMPT_PLACEHOLDER_TEXT} from "~utils";
 import {PromptScenarios} from "~options/constant/PromptScenarios";
 
+/** The built-in Translate prompt; the selection toolbar opens the Translate page for it. */
+export const TRANSLATE_PROMPT_ID = 1012;
+
 /**
  * Built-in prompts. `scenarios` lists where each one is shown by default (see PromptScenarios);
  * users rearrange or archive them per scenario in Options -> Prompt Manager.

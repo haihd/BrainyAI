@@ -21,7 +21,8 @@ import {getImageSrc} from "~options/component/Card";
 import popupSettingIcon from "data-base64:~assets/icon_popup_setting.svg";
 import SmallAskAiIcon from "data-base64:~assets/icon_ask_ai_small.svg";
 import askCloseIcon from "data-base64:~assets/icon_ask_close.svg";
-import {IAskAi, openPanelAskAi, openPanelSearchInContent} from "~libs/open-ai/open-panel";
+import {IAskAi, openPanelAskAi, openPanelSearchInContent, openPanelTranslate} from "~libs/open-ai/open-panel";
+import {TRANSLATE_PROMPT_ID} from "~options/constant/PromptDatas";
 import SearchBannerIcon from "data-base64:~assets/icon_search_banner.svg";
 import PupHeaderIcon from "data-base64:~assets/icon_pup_header.svg";
 import {SearchBar} from "~options/component/SearchBar";
@@ -306,7 +307,10 @@ export default function Base() {
             if(cardId){
                 Logger.log(`goToAskEngine===============${msg}`);
                 const card = cards.find((card) => card.id === cardId);
-                if (card != null) {
+                if (card?.id === TRANSLATE_PROMPT_ID) {
+                    // The built-in Translate prompt opens the Translate page (which keeps its own target language)
+                    openPanelTranslate(mergeAiMsg(msg, quotingText));
+                } else if (card != null) {
                     const iAskAI = new IAskAi({
                         prompt: card.text,
                         lang: card.language,

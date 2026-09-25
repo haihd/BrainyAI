@@ -12,7 +12,7 @@ import {
     STORAGE_OPEN_PANEL_INIT_DATA
 } from "~utils";
 import {Storage} from "@plasmohq/storage";
-import {IAskAi, type IOpenPanelData, OpenPanelType} from "~libs/open-ai/open-panel";
+import {IAskAi, type IOpenPanelData, type IOpenTranslate, OpenPanelType} from "~libs/open-ai/open-panel";
 import type {NavigateFunction} from  "react-router-dom";
 import {PanelRouterPath} from "~libs/constants";
 import {message} from "antd";
@@ -46,6 +46,8 @@ interface ISidePanelContext {
     reloadSiteFrame: (siteName: SiteName) => void;
     panelOpenType?: OpenPanelType;
     askAiData?: IAskAi
+    /** Latest text sent to the Translate page (e.g. from the selection toolbar). */
+    translateRequest?: IOpenTranslate
     navigation?: NavigateFunction;
     setNavigation: React.Dispatch<React.SetStateAction<NavigateFunction>>
     userLanguage: string;
@@ -114,6 +116,7 @@ const SidePanelProvider = ({children}: { children: ReactNode }) => {
     }));
     const [panelInitialized, setPanelInitialized] = useState(false);
     const [askAiData, setAskAiData] = useState<IAskAi>();
+    const [translateRequest, setTranslateRequest] = useState<IOpenTranslate>();
     const [panelOpenType, setPanelOpenType] = useState<OpenPanelType>();
     const [navigation, setNavigation] = useState<NavigateFunction>();
     const [userLanguage] = useState(navigator.language ?? "english");
@@ -135,6 +138,9 @@ const SidePanelProvider = ({children}: { children: ReactNode }) => {
                 } else if (data.openType === OpenPanelType.AI_ASK) {
                     targetPath = PanelRouterPath.CONVERSATION;
                     setAskAiData(data.data as IAskAi);
+                } else if (data.openType === OpenPanelType.TRANSLATE) {
+                    targetPath = PanelRouterPath.TRANSLATE;
+                    setTranslateRequest(data.data as IOpenTranslate);
                 }
 
                 const pathSplit = location.pathname.split('');
@@ -204,6 +210,7 @@ const SidePanelProvider = ({children}: { children: ReactNode }) => {
             reloadSiteFrame,
             panelOpenType,
             askAiData,
+            translateRequest,
             navigation,
             setNavigation,
             userLanguage,

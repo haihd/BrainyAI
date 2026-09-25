@@ -34,6 +34,16 @@ Each tab has a **Show on the list** column (drag to reorder) and an **Archive** 
 archive button, to hide them in that tab only). The first prompts are buttons and the others are in the dropdown; how many
 are buttons is set per tab (0–8, default 4, or 6 in Chat/Ask). **New Prompt** adds a prompt to the current tab and archives it in the others.
 
+### Translate
+
+The side panel has a **Translate** page (menu ☰ → Translate). The selection toolbar's **Translate** button opens it
+with the selected text and translates right away.
+
+- Top left: the models to translate with; each one gives its own translation, side by side.
+- Top right: the translation styles (Natural, Concise, Formal, Dynamic, ...); you can add your own.
+- Source language (or *Detect language*) → target language, the text, and **Translate** (Ctrl/⌘+Enter).
+- Each result can be copied, read aloud or translated again. The chosen models, styles and languages are remembered.
+
 ### Turning BrainyAI off on a website
 
 Hover the selection quick bar and click the small × at its top-right corner, then choose from the menu that opens beside it:
