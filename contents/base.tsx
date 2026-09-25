@@ -533,12 +533,12 @@ export default function Base() {
 
                 </div>
                 <Popover zIndex={BASE_ZINDEX+100} overlayInnerStyle={{padding: '6px 0'}} title={null} content={disableMenu}
-                    arrow={false} placement='bottomLeft' trigger='click' open={disableMenuOpen}
+                    arrow={false} placement='bottomRight' trigger='click' open={disableMenuOpen}
                     onOpenChange={(open) => {
                         disableMenuShown = open;
                         setDisableMenuOpen(open);
                     }}>
-                    <img className={'w-[14px] h-[14px] absolute top-0 left-0 cursor-pointer'}
+                    <img className={'w-[14px] h-[14px] absolute top-0 right-0 cursor-pointer'}
                         style={{visibility: barHovered || disableMenuOpen ? 'visible' : 'hidden'}}
                         title={'Disable BrainyAI'} src={askCloseIcon} alt='Disable BrainyAI'
                         onMouseDown={(e) => {

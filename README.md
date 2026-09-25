@@ -16,7 +16,7 @@ shown: those sites changed their private APIs and the listed models were retired
 
 ### Turning BrainyAI off on a website
 
-Hover the selection quick bar and click the small × at its top-left corner, then choose
+Hover the selection quick bar and click the small × at its top-right corner, then choose
 **Disable on this website** or **Disable on all websites**. On a disabled site BrainyAI shows nothing on the page
 (no quick bar, no page buttons, no ⌘/Ctrl+J ask box); the side panel still opens from the toolbar or ⌘/Ctrl+I.
 Turn it back on in **Options → Websites**, where you can also add or remove sites.
