@@ -32,6 +32,7 @@ import PupHeaderIcon from "data-base64:~assets/icon_pup_header.svg";
 import {SearchBar} from "~options/component/SearchBar";
 import {Logger} from "~utils/logger";
 import {BASE_ZINDEX} from "~component/common/CPopover";
+import {disableSite, isSiteDisabled, setDisabledAllSites, useSiteAccess} from "~utils/site-access";
 
 export const getStyle: PlasmoGetStyle = () => {
     const style = document.createElement("style");
@@ -68,7 +69,13 @@ let popIsShowByShortcuts = false;
  */
 let selectPopType = 1;
 
-let tempHostNames:string[] = [];
+/**
+ * BrainyAI is turned off on this page (Disable on this website / on all websites).
+ * Module-level so the page event listeners, registered once, see the current value.
+ */
+let pageDisabled = true;
+/** The "Hide BrainyAI" menu is open; clicks in it must not close the quick bar. */
+let disableMenuShown = false;
 
 export default function Base() {
     const [toolPositions, setToolPositions] = useState([0, 0]); // [x, y]
@@ -85,27 +92,27 @@ export default function Base() {
      */
     const [visibleAsk, setVisibleAsk] = useState(false);
     const [cards, setCards] = useStorage('promptData', PromptDatas);
-    const [quickConfigOpen, setQuickConfigOpen] = useState(false);
-    const [closeHostNames, setCloseHostNames] = useStorage<string[]>('CloseHostNamesData', []);
-    const appendCloseHostName = (newHostName: string) => {
-        setCloseHostNames(prevNames => {
-            if (!prevNames?.includes(newHostName)) {
-                return [...prevNames ?? [], newHostName];
-            }
-            return prevNames;
-        }).then(() => {
-            Logger.log('newHostName add success:=========', closeHostNames);
-        });
-    };
+    const [disableMenuOpen, setDisableMenuOpen] = useState(false);
+    const [barHovered, setBarHovered] = useState(false);
+    const siteAccess = useSiteAccess();
+    const hostname = window.location.hostname;
+    const disabledHere = !siteAccess.loaded || isSiteDisabled(siteAccess, hostname);
 
-    const appendTempCloseHostName = (newHostName: string) => {
-        if (!tempHostNames.includes(newHostName)) {
-            tempHostNames = [...tempHostNames, newHostName];
-            Logger.log('newTempHostName add success: ', newHostName);
+    useEffect(() => {
+        pageDisabled = disabledHere;
+        if (disabledHere) {
+            // Hide everything, but leave the page's own text selection alone
+            setShowTool(false);
+            setShowAskSearch(false);
+            setDisableMenuOpen(false);
+            disableMenuShown = false;
         }
-    };
+    }, [disabledHere]);
 
     function checkSelection() {
+        if (pageDisabled) {
+            return;
+        }
         const selection = window.getSelection();
         const selectionText = selection?.toString().trim();
 
@@ -134,7 +141,7 @@ export default function Base() {
             setVisibleAsk(false);
             setShowAskSearch(false);
         } else {
-            if(!popIsShowByShortcuts){
+            if(!popIsShowByShortcuts && !disableMenuShown){
                 setShowTool(false);
                 sendMessageQuotingCancel();
             }
@@ -142,24 +149,15 @@ export default function Base() {
     }
 
     async function showToolByConfig(){
-        const hostname = window.location.hostname;
-        const hostNames = await getLatestState(setCloseHostNames);
-        Logger.log('hostname================', hostname);
-        Logger.log('closeHostNames================', hostNames);
-        Logger.log('!closeHostNames.includes(hostname)======',!hostNames?.includes(hostname));
-        if (!hostNames?.includes(hostname) && !tempHostNames.includes(hostname)) {
+        if (!pageDisabled) {
             setShowTool(true);
         }
     }
 
-    async function closeAsKQuickBtn(){
-        const quickConfigOpen = await getLatestState(setQuickConfigOpen);
-        if(!quickConfigOpen){
-            setVisibleAsk(false);
-        }
-    }
-
     function showAskBar(isSelectText = false) {
+        if (pageDisabled) {
+            return;
+        }
         if(isSelectText){
             setShowAskContent(true);
         }else {
@@ -179,12 +177,6 @@ export default function Base() {
 
     const sendMessageQuotingCancel = function () {
         void chrome.runtime.sendMessage({action: MESSAGE_ACTION_SET_QUOTING_CANCEL});
-    };
-
-    const closeTool = function (e: React.MouseEvent<HTMLImageElement, MouseEvent>) {
-        e.stopPropagation();
-        setShowTool(false);
-        sendMessageQuotingCancel();
     };
 
     const askBarContentCopy = function (e: React.MouseEvent<HTMLImageElement, MouseEvent>) {
@@ -314,7 +306,7 @@ export default function Base() {
 
             document.body.addEventListener('mousedown', () => {
                 Logger.log(`addEventListener mousedown ===============`);
-                if(!popIsShowByShortcuts){
+                if(!popIsShowByShortcuts && !disableMenuShown){
                     Logger.log(`mousedown popIsShowByShortcuts=============${popIsShowByShortcuts}`);
                     setShowTool(false);
                     sendMessageQuotingCancel();
@@ -327,6 +319,9 @@ export default function Base() {
             });
 
             document.body.addEventListener('keydown', (e) => {
+                if (pageDisabled && !((e.metaKey || e.ctrlKey) && e.key === 'i')) {
+                    return;
+                }
                 if (e.shiftKey && e.metaKey && e.key === 'Enter') {
                     Logger.log('viewGroup shiftKey and metaKey and Enter ==============');
                     goToSearchByAskBar().then(() => {
@@ -402,22 +397,37 @@ export default function Base() {
         </div>
     );
 
-    const dealQuickBarVisibleConfig =  function (e: React.MouseEvent<HTMLElement, MouseEvent>, type: number) {
+    async function disableBrainyAI(e: React.MouseEvent<HTMLElement, MouseEvent>, scope: 'site' | 'all') {
         e.stopPropagation();
-        Logger.log('dealQuickBarVisibleConfig================', type);
-        const currentDomain = window.location.hostname;
-        if(type == 1){
-            appendTempCloseHostName(currentDomain);
-        }else if(type == 2){
-            appendCloseHostName(currentDomain);
+        setDisableMenuOpen(false);
+        disableMenuShown = false;
+        if (scope === 'site') {
+            await disableSite(hostname);
+        } else {
+            await setDisabledAllSites(true);
         }
-        setQuickConfigOpen(false);
-    };
+        Logger.log(`BrainyAI disabled on ${scope === 'site' ? hostname : 'all websites'}`);
+    }
 
-    const popupQuickPromptConfig = (
-        <div className={baseContentStyle.popupQuickConfig}>
-            <div onClick={(e) => dealQuickBarVisibleConfig(e,1)}>Hide until Next visit</div>
-            <div onClick={(e) => dealQuickBarVisibleConfig(e,2)}>Disable for this site</div>
+    const disableMenu = (
+        // preventDefault keeps the page's text selection when an option is clicked
+        <div className={baseContentStyle.popupQuickConfig} onMouseDown={(e) => e.preventDefault()}>
+            <div className={baseContentStyle.menuTitle}>Hide BrainyAI</div>
+            <div className={baseContentStyle.menuItem} onClick={(e) => disableBrainyAI(e, 'site')}>
+                <span className={baseContentStyle.menuLabel}>Disable on this website</span>
+                <span className={baseContentStyle.menuSub}>{hostname}</span>
+            </div>
+            <div className={baseContentStyle.menuItem} onClick={(e) => disableBrainyAI(e, 'all')}>
+                <span className={baseContentStyle.menuLabel}>Disable on all websites</span>
+            </div>
+            <div className={baseContentStyle.menuFooter}>
+                Turn it back on in <a className={baseContentStyle.menuLink} onClick={(e) => {
+                    e.stopPropagation();
+                    setDisableMenuOpen(false);
+                    disableMenuShown = false;
+                    window.open(`chrome-extension://${chrome.runtime.id}/options.html`);
+                }}>Settings → Websites</a>.
+            </div>
         </div>
     );
 
@@ -468,6 +478,10 @@ export default function Base() {
         }
     };
 
+    if (disabledHere) {
+        return null;
+    }
+
     return <div>
         {
             <div ref={divRef} style={{
@@ -475,8 +489,11 @@ export default function Base() {
                 top: `${toolPositions[1]}px`,
                 display: showTool ? 'block' : 'none',
                 padding: '6px',
-            }} className={'relative'} onMouseLeave={() => {
-                void closeAsKQuickBtn();
+            }} className={'relative'}
+            onMouseEnter={() => setBarHovered(true)}
+            onMouseLeave={() => {
+                setBarHovered(false);
+                setVisibleAsk(false);
             }}>
                 <div style={{
                     display: 'flex',
@@ -515,12 +532,20 @@ export default function Base() {
                     </div>
 
                 </div>
-                <Popover zIndex={BASE_ZINDEX+100} overlayInnerStyle={{paddingLeft: 0, paddingRight:0,paddingTop:'8px',paddingBottom:'8px'}} title={null} content={popupQuickPromptConfig} arrow={false} placement='bottomLeft' open={quickConfigOpen}
-                    onOpenChange={(isOpen) => {
-                        Logger.log(`quickConfigOpen=================${isOpen}`);
-                        setQuickConfigOpen(isOpen);}}>
-                    {visibleAsk && <img className={'w-[14px] h-[14px] absolute top-0 right-0 cursor-pointer'} src={askCloseIcon} alt=''
-                        onClick={closeTool}/>}
+                <Popover zIndex={BASE_ZINDEX+100} overlayInnerStyle={{padding: '6px 0'}} title={null} content={disableMenu}
+                    arrow={false} placement='bottomLeft' trigger='click' open={disableMenuOpen}
+                    onOpenChange={(open) => {
+                        disableMenuShown = open;
+                        setDisableMenuOpen(open);
+                    }}>
+                    <img className={'w-[14px] h-[14px] absolute top-0 left-0 cursor-pointer'}
+                        style={{visibility: barHovered || disableMenuOpen ? 'visible' : 'hidden'}}
+                        title={'Disable BrainyAI'} src={askCloseIcon} alt='Disable BrainyAI'
+                        onMouseDown={(e) => {
+                            // keep the page selection and the quick bar while the menu opens
+                            e.preventDefault();
+                            e.stopPropagation();
+                        }}/>
                 </Popover>
             </div>
         }
