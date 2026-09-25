@@ -1,11 +1,11 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {useDrag, useDrop} from 'react-dnd';
-import {Tooltip} from 'antd';
+import {InputNumber, Tooltip} from 'antd';
 import {DeleteOutlined, EditOutlined, InboxOutlined, PlusCircleOutlined} from '@ant-design/icons';
 import {getIconSrc} from "~options/component/AiEnginePage";
 import {getImageSrc} from "~options/component/Card";
 import {PromptTypes} from "~options/constant/PromptTypes";
-import {type PromptScenario, TOOLBAR_SLOTS} from "~options/constant/PromptScenarios";
+import {MAX_TOOLBAR_SLOTS, MIN_TOOLBAR_SLOTS, type PromptScenario} from "~options/constant/PromptScenarios";
 import type {Card} from "~options/component/SearchBar";
 import IconDrag from "data-base64:~assets/icon_drag.svg";
 
@@ -17,6 +17,12 @@ interface DragItem {
     id: number;
     column: Column;
 }
+
+const SLOT_SETTING_LABELS: Record<PromptScenario, string> = {
+    ask: 'Buttons in the Ask box',
+    reading: 'Toolbar buttons',
+    writing: 'Toolbar buttons',
+};
 
 const SLOT_HINTS: Record<PromptScenario, [string, string]> = {
     ask: ['Buttons in the Ask box', 'In the Ask box\'s dropdown'],
@@ -121,12 +127,15 @@ interface BoardProps {
     /** Ids shown in this scenario, in order. */
     shownIds: number[];
     onChange: (shownIds: number[]) => void;
+    /** How many of the shown prompts are buttons; the rest are in the dropdown. */
+    slots: number;
+    onSlotsChange: (slots: number) => void;
     onEdit: (card: Card) => void;
     onDelete: (card: Card) => void;
 }
 
 /** "Show on the list" and "Archive" columns for one scenario, with drag and drop between them. */
-export function PromptBoard({scenario, cards, shownIds, onChange, onEdit, onDelete}: BoardProps) {
+export function PromptBoard({scenario, cards, shownIds, onChange, slots, onSlotsChange, onEdit, onDelete}: BoardProps) {
     // While dragging, the order lives here and is saved once on drop (chrome.storage.sync limits writes per minute)
     const [draft, setDraft] = useState<number[] | null>(null);
     const draftRef = useRef<number[] | null>(null);
@@ -192,22 +201,31 @@ export function PromptBoard({scenario, cards, shownIds, onChange, onEdit, onDele
     const byId = new Map(cards.map(card => [card.id, card]));
     const shown = ids.map(id => byId.get(id)).filter(Boolean) as Card[];
     const archived = cards.filter(card => !ids.includes(card.id));
-    const slots = TOOLBAR_SLOTS[scenario];
     const [aboveHint, belowHint] = SLOT_HINTS[scenario];
     const itemProps = {onHoverItem, onDragEnd, onEdit, onToggle: toggle, onDelete};
 
     return (
         <div className={'grid grid-cols-2 gap-[16px] mt-[12px]'}>
             <div>
-                <div className={'flex items-center gap-[6px] text-[#333333] font-[600] text-[14px] mb-[8px]'}>
-                    Show on the list <span className={'text-[#8C8C8C] font-[400]'}>({shown.length})</span>
+                <div className={'flex items-center justify-between h-[24px] mb-[8px]'}>
+                    <div className={'flex items-center gap-[6px] text-[#333333] font-[600] text-[14px]'}>
+                        Show on the list <span className={'text-[#8C8C8C] font-[400]'}>({shown.length})</span>
+                    </div>
+                    <Tooltip title={`The first ${slots} prompts are buttons; the others are in the dropdown.`}>
+                        <label className={'flex items-center gap-[6px] text-[#5E5E5E] text-[13px]'}>
+                            {SLOT_SETTING_LABELS[scenario]}
+                            <InputNumber size="small" className={'w-[56px]'} aria-label={SLOT_SETTING_LABELS[scenario]}
+                                min={MIN_TOOLBAR_SLOTS} max={MAX_TOOLBAR_SLOTS} value={slots} precision={0}
+                                onChange={(value) => value != null && onSlotsChange(value)}/>
+                        </label>
+                    </Tooltip>
                 </div>
                 <ColumnDrop column="shown" onHoverColumn={onHoverColumn} onDrop={onDrop}>
                     {shown.length === 0 &&
                         <div className={'text-[#8C8C8C] text-[13px] text-center py-[40px]'}>Drag prompts here to show them.</div>}
                     {shown.map((card, index) => (
                         <React.Fragment key={card.id}>
-                            {index === 0 && <SlotLabel text={aboveHint}/>}
+                            {index === 0 && slots > 0 && <SlotLabel text={aboveHint}/>}
                             {index === slots && <SlotLabel text={belowHint}/>}
                             <PromptItem card={card} column="shown" {...itemProps}/>
                         </React.Fragment>
@@ -215,7 +233,7 @@ export function PromptBoard({scenario, cards, shownIds, onChange, onEdit, onDele
                 </ColumnDrop>
             </div>
             <div>
-                <div className={'flex items-center gap-[6px] text-[#333333] font-[600] text-[14px] mb-[8px]'}>
+                <div className={'flex items-center gap-[6px] h-[24px] text-[#333333] font-[600] text-[14px] mb-[8px]'}>
                     <InboxOutlined/> Archive <span className={'text-[#8C8C8C] font-[400]'}>({archived.length})</span>
                 </div>
                 <ColumnDrop column="archive" onHoverColumn={onHoverColumn} onDrop={onDrop}>

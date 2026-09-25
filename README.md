@@ -31,8 +31,8 @@ Choose and order the actions in **Options → Prompt Manager**. It has a tab per
 | **Writing Assistant** | the toolbar on text selected in a text field |
 
 Each tab has a **Show on the list** column (drag to reorder) and an **Archive** column (drag prompts there, or use the
-archive button, to hide them in that tab only). The first 4 prompts (6 in Chat/Ask) are buttons; the others are in the
-dropdown. **New Prompt** adds a prompt to the current tab and archives it in the others.
+archive button, to hide them in that tab only). The first prompts are buttons and the others are in the dropdown; how many
+are buttons is set per tab (0–8, default 4, or 6 in Chat/Ask). **New Prompt** adds a prompt to the current tab and archives it in the others.
 
 ### Turning BrainyAI off on a website
 

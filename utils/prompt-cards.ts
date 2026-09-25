@@ -1,14 +1,20 @@
 import {useCallback, useMemo} from "react";
 import {useStorage} from "@plasmohq/storage/dist/hook";
 import {PromptDatas} from "~options/constant/PromptDatas";
-import {PROMPT_SCENARIOS, type PromptScenario} from "~options/constant/PromptScenarios";
+import {MAX_TOOLBAR_SLOTS, MIN_TOOLBAR_SLOTS, PROMPT_SCENARIOS, type PromptScenario, TOOLBAR_SLOTS} from "~options/constant/PromptScenarios";
 import type {Card} from "~options/component/SearchBar";
 
 /** Per scenario, the ids of the prompts shown, in order. Prompts not listed are archived there. */
 export type PromptLayout = Record<PromptScenario, number[]> & {
     /** Every prompt id the layout has seen, so prompts added later (new built-ins) can be placed once. */
     known: number[];
+    /** How many prompts are buttons, per scenario; missing means TOOLBAR_SLOTS. */
+    slots?: Partial<Record<PromptScenario, number>>;
 };
+
+function clampSlots(value: number): number {
+    return Math.min(MAX_TOOLBAR_SLOTS, Math.max(MIN_TOOLBAR_SLOTS, Math.round(value)));
+}
 
 const PROMPT_LAYOUT_KEY = 'promptLayout';
 const ALL_SCENARIOS = PROMPT_SCENARIOS.map(s => s.id);
@@ -30,7 +36,7 @@ export function normalizePromptCards(stored: Card[] | undefined): Card[] {
 export function normalizePromptLayout(cards: Card[], stored: PromptLayout | undefined): PromptLayout {
     const known = new Set(stored?.known ?? []);
     const existing = new Set(cards.map(card => card.id));
-    const layout = {known: cards.map(card => card.id)} as PromptLayout;
+    const layout = {known: cards.map(card => card.id), slots: stored?.slots} as PromptLayout;
     for (const scenario of ALL_SCENARIOS) {
         const ids = (stored?.[scenario] ?? []).filter(id => existing.has(id));
         const added = cards.filter(card => !known.has(card.id) && defaultScenarios(card).includes(scenario)).map(card => card.id);
@@ -51,6 +57,9 @@ export interface PromptLibrary {
     /** Sets the shown ids of one scenario (order matters). */
     setShown: (scenario: PromptScenario, ids: number[]) => Promise<void>;
     setLayout: (layout: PromptLayout) => Promise<void>;
+    /** How many of a scenario's prompts are buttons; the rest are in the dropdown. */
+    slots: (scenario: PromptScenario) => number;
+    setSlots: (scenario: PromptScenario, count: number) => Promise<void>;
 }
 
 /** The prompt definitions ("promptData") and where each one is shown ("promptLayout"). */
@@ -68,5 +77,10 @@ export function usePromptLibrary(): PromptLibrary {
     const setShown = useCallback((scenario: PromptScenario, ids: number[]) =>
         setStoredLayout({...layout, [scenario]: ids}), [layout, setStoredLayout]);
 
-    return {cards, layout, shown, archived, setCards: setStoredCards, setShown, setLayout: setStoredLayout};
+    const slots = useCallback((scenario: PromptScenario) =>
+        clampSlots(layout.slots?.[scenario] ?? TOOLBAR_SLOTS[scenario]), [layout]);
+    const setSlots = useCallback((scenario: PromptScenario, count: number) =>
+        setStoredLayout({...layout, slots: {...layout.slots, [scenario]: clampSlots(count)}}), [layout, setStoredLayout]);
+
+    return {cards, layout, shown, archived, setCards: setStoredCards, setShown, setLayout: setStoredLayout, slots, setSlots};
 }

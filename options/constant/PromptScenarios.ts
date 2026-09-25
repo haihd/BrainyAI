@@ -28,9 +28,15 @@ export const PROMPT_SCENARIOS: { id: PromptScenario, label: string, help: string
     },
 ];
 
-/** How many of a scenario's prompts get a button; the others are in the dropdown. */
+/**
+ * Default number of a scenario's prompts shown as buttons; the others are in the dropdown.
+ * Users change it per tab in the Prompt Manager (see PromptLayout.slots).
+ */
 export const TOOLBAR_SLOTS: Record<PromptScenario, number> = {
     ask: 6,
     reading: 4,
     writing: 4,
 };
+
+export const MIN_TOOLBAR_SLOTS = 0;
+export const MAX_TOOLBAR_SLOTS = 8;

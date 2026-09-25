@@ -27,7 +27,7 @@ export function getIconSrc(key?: string) {
 
 }
 export default function AiEnginePage() {
-    const {cards, layout, setCards, setShown, setLayout} = usePromptLibrary();
+    const {cards, layout, setCards, setShown, setLayout, slots, setSlots} = usePromptLibrary();
     const [activeScenario, setActiveScenario] = useState<PromptScenario>(PromptScenarios.ASK);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isReadOnly, setIsReadOnly] = useState(false);
@@ -291,6 +291,8 @@ export default function AiEnginePage() {
                     cards={cards}
                     shownIds={layout[activeScenario]}
                     onChange={(ids) => void setShown(activeScenario, ids)}
+                    slots={slots(activeScenario)}
+                    onSlotsChange={(count) => void setSlots(activeScenario, count)}
                     onEdit={(card: Card) => editCard(`${card.id}`)}
                     onDelete={(card: Card) => deleteConfirm(`${card.id}`)}
                 />

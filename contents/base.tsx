@@ -30,7 +30,7 @@ import {BASE_ZINDEX} from "~component/common/CPopover";
 import {disableSite, isSiteDisabled, setDisabledAllSites, useSiteAccess} from "~utils/site-access";
 import {usePromptLibrary} from "~utils/prompt-cards";
 import {type SelectionContext, SelectionContexts} from "~options/constant/SelectionContexts";
-import {PROMPT_SCENARIOS, PromptScenarios, TOOLBAR_SLOTS} from "~options/constant/PromptScenarios";
+import {PROMPT_SCENARIOS, PromptScenarios} from "~options/constant/PromptScenarios";
 
 export const getStyle: PlasmoGetStyle = () => {
     const style = document.createElement("style");
@@ -141,7 +141,7 @@ export default function Base() {
      * quick bar Keyboard shortcuts is show?
      */
     const [visibleAsk, setVisibleAsk] = useState(false);
-    const {cards, shown} = usePromptLibrary();
+    const {cards, shown, slots} = usePromptLibrary();
     const [selectionContext, setSelectionContext] = useState<SelectionContext>(SelectionContexts.TEXT);
     // Page text -> Reading Assistant prompts, text fields -> Writing Assistant prompts
     const scenario = selectionContext === SelectionContexts.EDITABLE ? PromptScenarios.WRITING : PromptScenarios.READING;
@@ -548,7 +548,7 @@ export default function Base() {
                         <div className={"w-[1px] h-[14px] bg-[#000000] opacity-[.12] mx-[3px]"}></div>
                     </div>
                     <div >
-                        <SearchBar compact cards={contextCards.slice(0, TOOLBAR_SLOTS[scenario])} showSearch={selectionContext === SelectionContexts.TEXT} popupPrompt={popupPrompt} isVisible={visiblePop ?? false} onOpenChange={(visiblePopup) =>{
+                        <SearchBar compact cards={contextCards.slice(0, slots(scenario))} showSearch={selectionContext === SelectionContexts.TEXT} popupPrompt={popupPrompt} isVisible={visiblePop ?? false} onOpenChange={(visiblePopup) =>{
                             if(visiblePopup) {
                                 selectPopType = 1;
                             }
@@ -648,7 +648,7 @@ export default function Base() {
                 <div className={'flex flex-row justify-between mt-[8px] me-[16px] items-center mb-[8px]'}>
                     <div
                         className={'h-[25px] text-[#C2C2C2] bg-[#F3F4F9] rounded-tr-[8px] rounded-br-[8px] px-[8px] py-[4px] text-[12px] font-[400] me-[12px] whitespace-nowrap cursor-pointer flex justify-center items-center'} onClick={()=>sendAskAIDefault()}>{'⏎ AskAI'}</div>
-                    <SearchBar cards={askCards.slice(0, TOOLBAR_SLOTS.ask)} popupPrompt={popupPrompt} isVisible={visible ?? false}
+                    <SearchBar cards={askCards.slice(0, slots(PromptScenarios.ASK))} popupPrompt={popupPrompt} isVisible={visible ?? false}
                         onOpenChange={(visibleAskPop) => {
                             Logger.log(`visibleAskPop=================${visibleAskPop}`);
                             if (visibleAskPop) {
