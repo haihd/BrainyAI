@@ -574,7 +574,7 @@ export const AIMessage = memo(({message, i}: {
         });
 
         window.addEventListener('mousedown', (e: MouseEvent) => {
-            if (e.target !== switchRef.current && !popoverRef.current!.contains(e.target as Node) ) {
+            if (e.target !== switchRef.current && !popoverRef.current?.contains(e.target as Node)) {
                 setPopoverOpen(false);
             }
         });

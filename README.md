@@ -7,8 +7,12 @@ Supported API providers (set the key and model in **Options → API Keys & Model
 - OpenAI (default model `gpt-5-mini`)
 - Google Gemini (default model `gemini-flash-latest`, an alias Google moves to each new Flash release)
 - DeepSeek (default model `deepseek-v4-flash`)
+- Moonshot Kimi (default model `kimi-k3`; set the base URL to `https://api.moonshot.cn/v1` for China-platform keys)
 - Custom: any OpenAI-compatible API (OpenRouter, Groq, Mistral, xAI, LM Studio, ...) by base URL
 - Ollama (local)
+
+The original website-login models (ChatGPT web, Microsoft Copilot, Kimi web, Perplexity Labs) are no longer
+shown: those sites changed their private APIs and the listed models were retired. Use the official APIs above instead.
 
 ### New model releases
 

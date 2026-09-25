@@ -2,6 +2,7 @@ import IconOpenAI from "data-base64:~assets/simple-icons_openai.svg";
 import IconGemini from "data-base64:~assets/gemini.svg";
 import IconDeepSeek from "data-base64:~assets/deepseek.svg";
 import IconApi from "data-base64:~assets/api.svg";
+import IconKimi from "data-base64:~assets/kimi.png";
 
 /**
  * An API provider that speaks the OpenAI Chat Completions protocol
@@ -21,6 +22,8 @@ export interface ApiProviderConfig {
     baseUrl: string;
     /** Whether the user may override the base URL in the settings page. */
     editableBaseUrl?: boolean;
+    /** Help text under the base URL field. */
+    baseUrlHint?: string;
     /**
      * Used until the user picks a model. Prefer a "latest" alias where the provider
      * offers one, so new releases are picked up without a code change.
@@ -36,6 +39,8 @@ export interface ApiProviderConfig {
     preferredModels: RegExp[];
     /** Where the user creates an API key. */
     apiKeyUrl: string;
+    /** Text of the apiKeyUrl link; defaults to "Get an API key". */
+    apiKeyLinkLabel?: string;
     apiKeyPlaceholder: string;
     logoSrc: string;
     maxTokenLimit: number;
@@ -85,16 +90,34 @@ export const API_PROVIDERS: ApiProviderConfig[] = [
         maxTokenLimit: 64000,
     },
     {
+        id: "moonshot",
+        label: "Kimi",
+        vendor: "Moonshot (Kimi)",
+        baseUrl: "https://api.moonshot.ai/v1",
+        // Keys from the China platform only work with https://api.moonshot.cn/v1
+        editableBaseUrl: true,
+        baseUrlHint: "Use https://api.moonshot.cn/v1 for keys from the China platform.",
+        defaultModel: "kimi-k3",
+        modelSuggestions: ["kimi-k3", "kimi-k2.6"],
+        preferredModels: [/^kimi-k[\d.]+$/, /^kimi/],
+        apiKeyUrl: "https://platform.kimi.ai/",
+        apiKeyPlaceholder: "sk-...",
+        logoSrc: IconKimi,
+        maxTokenLimit: 256000,
+    },
+    {
         // Any other OpenAI-compatible service: OpenRouter, Groq, Mistral, xAI, LM Studio, ...
         id: "custom",
         label: "Custom API",
         vendor: "Custom (OpenAI-compatible)",
         baseUrl: "",
         editableBaseUrl: true,
+        baseUrlHint: "The URL before /chat/completions, e.g. https://openrouter.ai/api/v1",
         defaultModel: "",
         modelSuggestions: [],
         preferredModels: [],
         apiKeyUrl: "https://platform.openai.com/docs/api-reference/chat",
+        apiKeyLinkLabel: "API reference",
         apiKeyPlaceholder: "API key",
         logoSrc: IconApi,
         maxTokenLimit: 128000,

@@ -158,13 +158,12 @@ export default function ApiKeyPage() {
                                         {provider.vendor}
                                     </span>
                                     <a href={provider.apiKeyUrl} target="_blank" rel="noreferrer" className={'text-[13px] font-[400]'}>
-                                        {provider.editableBaseUrl ? 'API reference' : 'Get an API key'}
+                                        {provider.apiKeyLinkLabel ?? 'Get an API key'}
                                     </a>
                                 </div>
                                 {provider.editableBaseUrl &&
-                                    <Form.Item label="Base URL" name={baseUrlStorageKey(provider.id)}
-                                        extra="The URL before /chat/completions, e.g. https://openrouter.ai/api/v1">
-                                        <Input placeholder="https://.../v1"/>
+                                    <Form.Item label="Base URL" name={baseUrlStorageKey(provider.id)} extra={provider.baseUrlHint}>
+                                        <Input placeholder={provider.baseUrl || 'https://.../v1'}/>
                                     </Form.Item>}
                                 <Form.Item label="API Key" name={apiKeyStorageKey(provider.id)}>
                                     <Input.Password placeholder={provider.apiKeyPlaceholder} autoComplete="off"
