@@ -7,10 +7,3 @@ export const SelectionContexts = {
 } as const;
 
 export type SelectionContext = typeof SelectionContexts[keyof typeof SelectionContexts];
-
-export const ALL_SELECTION_CONTEXTS: SelectionContext[] = [SelectionContexts.TEXT, SelectionContexts.EDITABLE];
-
-export const SELECTION_CONTEXT_LABELS: Record<SelectionContext, string> = {
-    text: 'Page text',
-    editable: 'Text fields',
-};

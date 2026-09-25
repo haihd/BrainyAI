@@ -19,9 +19,6 @@ import {PromptTypes} from "~options/constant/PromptTypes";
 import {getIconSrc} from "~options/component/AiEnginePage";
 import {getImageSrc} from "~options/component/Card";
 import popupSettingIcon from "data-base64:~assets/icon_popup_setting.svg";
-import DingSelectIcon from "data-base64:~assets/icon_ding_select.svg";
-import DingUnSelectIcon from "data-base64:~assets/icon_ding_unselect.svg";
-import update from "immutability-helper";
 import SmallAskAiIcon from "data-base64:~assets/icon_ask_ai_small.svg";
 import askCloseIcon from "data-base64:~assets/icon_ask_close.svg";
 import {IAskAi, openPanelAskAi, openPanelSearchInContent} from "~libs/open-ai/open-panel";
@@ -31,8 +28,9 @@ import {SearchBar} from "~options/component/SearchBar";
 import {Logger} from "~utils/logger";
 import {BASE_ZINDEX} from "~component/common/CPopover";
 import {disableSite, isSiteDisabled, setDisabledAllSites, useSiteAccess} from "~utils/site-access";
-import {cardShowsIn, usePromptCards} from "~utils/prompt-cards";
-import {SELECTION_CONTEXT_LABELS, type SelectionContext, SelectionContexts} from "~options/constant/SelectionContexts";
+import {usePromptLibrary} from "~utils/prompt-cards";
+import {type SelectionContext, SelectionContexts} from "~options/constant/SelectionContexts";
+import {PROMPT_SCENARIOS, PromptScenarios, TOOLBAR_SLOTS} from "~options/constant/PromptScenarios";
 
 export const getStyle: PlasmoGetStyle = () => {
     const style = document.createElement("style");
@@ -143,9 +141,12 @@ export default function Base() {
      * quick bar Keyboard shortcuts is show?
      */
     const [visibleAsk, setVisibleAsk] = useState(false);
-    const [cards, setCards] = usePromptCards();
+    const {cards, shown} = usePromptLibrary();
     const [selectionContext, setSelectionContext] = useState<SelectionContext>(SelectionContexts.TEXT);
-    const contextCards = useMemo(() => cards.filter(card => cardShowsIn(card, selectionContext)), [cards, selectionContext]);
+    // Page text -> Reading Assistant prompts, text fields -> Writing Assistant prompts
+    const scenario = selectionContext === SelectionContexts.EDITABLE ? PromptScenarios.WRITING : PromptScenarios.READING;
+    const contextCards = useMemo(() => shown(scenario), [shown, scenario]);
+    const askCards = useMemo(() => shown(PromptScenarios.ASK), [shown]);
     const [disableMenuOpen, setDisableMenuOpen] = useState(false);
     const [barHovered, setBarHovered] = useState(false);
     const siteAccess = useSiteAccess();
@@ -415,7 +416,7 @@ export default function Base() {
             <div className={baseContentStyle.header}>
                 <div className={baseContentStyle.title} >
                     Shortcut Menu
-                    {selectPopType == 1 && <span className={baseContentStyle.titleContext}> · {SELECTION_CONTEXT_LABELS[selectionContext]}</span>}
+                    <span className={baseContentStyle.titleContext}> · {PROMPT_SCENARIOS.find(item => item.id === (selectPopType == 1 ? scenario : PromptScenarios.ASK))?.label}</span>
                 </div>
                 <img className={baseContentStyle.iconImage} src={popupSettingIcon} alt='' onClick={() => {
                     window.open(`chrome-extension://${chrome.runtime.id}/options.html`);
@@ -423,7 +424,7 @@ export default function Base() {
             </div>
             <List
                 itemLayout="vertical"
-                dataSource={selectPopType == 1 ? contextCards : cards}
+                dataSource={selectPopType == 1 ? contextCards : askCards}
                 bordered={false}
                 split={false}
                 className={`hideScrollBar ${baseContentStyle.listWrap}`}
@@ -438,11 +439,6 @@ export default function Base() {
                                         <img className={baseContentStyle.leadingIcon} src={getImageSrc(car.imageKey)} alt={''}/>}
                                     <div className={baseContentStyle.leadingText}>{car.title}</div>
                                 </div>
-                                <img className={baseContentStyle.pinIcon}
-                                    src={car.isSelect?DingSelectIcon:DingUnSelectIcon} alt='' onClick={(e) =>{
-                                        e.stopPropagation();
-                                        setPromptIsDisplay(car,index,e);
-                                    }}/>
                             </div>
                         </List.Item>
                     );
@@ -496,20 +492,6 @@ export default function Base() {
         }
         Logger.log('itemClick===============', car.id, index, msg);
         goToAskEngine(msg,car.id,undefined);
-    }
-
-    function setPromptIsDisplay(car: any, index: number,e: React.MouseEvent<HTMLImageElement>) {
-        e.stopPropagation();
-        Logger.log('setPromptIsDisplay===============', car, index);
-        // `index` is into the (possibly filtered) dropdown list, so look the prompt up by id
-        const cardIndex = cards.findIndex(card => card.id === car.id);
-        void setCards(
-            update(cards, {
-                [cardIndex]: {
-                    isSelect: {$set: !car.isSelect},
-                },
-            }),
-        );
     }
 
     const handleKeyDown = (e) => {
@@ -566,7 +548,7 @@ export default function Base() {
                         <div className={"w-[1px] h-[14px] bg-[#000000] opacity-[.12] mx-[3px]"}></div>
                     </div>
                     <div >
-                        <SearchBar compact cards={contextCards} showSearch={selectionContext === SelectionContexts.TEXT} popupPrompt={popupPrompt} isVisible={visiblePop ?? false} onOpenChange={(visiblePopup) =>{
+                        <SearchBar compact cards={contextCards.slice(0, TOOLBAR_SLOTS[scenario])} showSearch={selectionContext === SelectionContexts.TEXT} popupPrompt={popupPrompt} isVisible={visiblePop ?? false} onOpenChange={(visiblePopup) =>{
                             if(visiblePopup) {
                                 selectPopType = 1;
                             }
@@ -666,7 +648,7 @@ export default function Base() {
                 <div className={'flex flex-row justify-between mt-[8px] me-[16px] items-center mb-[8px]'}>
                     <div
                         className={'h-[25px] text-[#C2C2C2] bg-[#F3F4F9] rounded-tr-[8px] rounded-br-[8px] px-[8px] py-[4px] text-[12px] font-[400] me-[12px] whitespace-nowrap cursor-pointer flex justify-center items-center'} onClick={()=>sendAskAIDefault()}>{'⏎ AskAI'}</div>
-                    <SearchBar cards={cards} popupPrompt={popupPrompt} isVisible={visible ?? false}
+                    <SearchBar cards={askCards.slice(0, TOOLBAR_SLOTS.ask)} popupPrompt={popupPrompt} isVisible={visible ?? false}
                         onOpenChange={(visibleAskPop) => {
                             Logger.log(`visibleAskPop=================${visibleAskPop}`);
                             if (visibleAskPop) {

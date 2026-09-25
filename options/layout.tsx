@@ -43,7 +43,7 @@ export default function Layout() {
                                         isSelected={selected === 'ContactUs'}/>*/}
                 <ImageTextComponent onClick={() => handleClick({id: 'Shortcut', path: PATH_SETTING_SHORTCUT})}
                     imageSrc={IconShortcut} imageSrcSelected={IconShortcutSelected}
-                    text={'Shortcut Menu'} className={''}
+                    text={'Prompt Manager'} className={''}
                     isSelected={selected === 'Shortcut'}/>
                 <ImageTextComponent 
                     onClick={() => handleClick({id: 'ApiKey', path: PATH_SETTING_APIKEY})}

@@ -1,16 +1,15 @@
 import update from 'immutability-helper';
 import React, {useCallback, useContext, useRef, useState} from 'react';
-import {useDrop} from 'react-dnd';
-import {ItemTypes} from "~options/component/ItemTypes";
-import {Card, getImageSrc} from "~options/component/Card";
-import IconPlus from "data-base64:~assets/icon_plus.svg";
-import {Button, Checkbox, Dropdown, Modal, Popover, Space} from "antd";
+import {getImageSrc} from "~options/component/Card";
+import {Button, Dropdown, Modal, Popover, Space, Tabs, Tooltip} from "antd";
 import EditPlusIcon from "data-base64:~assets/icon_add_plus.svg";
 import QuestionIcon from "data-base64:~assets/icon_question.svg";
 import CTooltip from "~component/common/CTooltip";
-import {DownOutlined} from '@ant-design/icons';
-import {usePromptCards} from "~utils/prompt-cards";
-import {ALL_SELECTION_CONTEXTS, SELECTION_CONTEXT_LABELS, type SelectionContext} from "~options/constant/SelectionContexts";
+import {DownOutlined, PlusOutlined, QuestionCircleOutlined} from '@ant-design/icons';
+import {usePromptLibrary} from "~utils/prompt-cards";
+import {PROMPT_SCENARIOS, type PromptScenario, PromptScenarios} from "~options/constant/PromptScenarios";
+import {PromptBoard} from "~options/component/PromptBoard";
+import type {Card} from "~options/component/SearchBar";
 import {PromptTypes} from "~options/constant/PromptTypes";
 import {OptionsContext} from "~provider/Options";
 import IconDeleteRed from "data-base64:~assets/icon_delete_red.svg";
@@ -28,12 +27,11 @@ export function getIconSrc(key?: string) {
 
 }
 export default function AiEnginePage() {
-    const [cards, setCards] = usePromptCards();
-    const [promptContexts, setPromptContexts] = useState<SelectionContext[]>(ALL_SELECTION_CONTEXTS);
+    const {cards, layout, setCards, setShown, setLayout} = usePromptLibrary();
+    const [activeScenario, setActiveScenario] = useState<PromptScenario>(PromptScenarios.ASK);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isReadOnly, setIsReadOnly] = useState(false);
     const [language, setLanguage] = useState('English');
-    const [, drop] = useDrop(() => ({accept: ItemTypes.CARD}));
     const {messageApi} = useContext(OptionsContext);
     const showType = useRef(0);
     const editId = useRef('');
@@ -120,40 +118,8 @@ export default function AiEnginePage() {
         };
     }
 
-    const moveCard = useCallback(
-        (id: string, atIndex: number) => {
-            const {card, index} = findCard(id);
-            void setCards(
-                update(cards, {
-                    $splice: [
-                        [index, 1],
-                        [atIndex, 0, card],
-                    ],
-                }),
-            );
-        },
-        [findCard, cards, setCards],
-    );
-
-    function toggleContext(id: string, context: SelectionContext) {
-        const {card, index} = findCardUnUseCallBack(id);
-        const current: SelectionContext[] = card.contexts ?? ALL_SELECTION_CONTEXTS;
-        const next = current.includes(context) ? current.filter(c => c !== context) : [...current, context];
-        if (!next.length) {
-            void messageApi.warning('A shortcut needs at least one place to show.');
-            return;
-        }
-        void setCards(update(cards, {[index]: {contexts: {$set: ALL_SELECTION_CONTEXTS.filter(c => next.includes(c))}}}));
-    }
-
-    function togglePinned(id: string) {
-        const {card, index} = findCardUnUseCallBack(id);
-        void setCards(update(cards, {[index]: {isSelect: {$set: !card.isSelect}}}));
-    }
-
     function creatShowModal(isShow: boolean) {
         Logger.log(`creatShowModal=======${isShow}`);
-        setPromptContexts(ALL_SELECTION_CONTEXTS);
         showType.current = 0;
         setSelectedIcon(defaultIcon);
         setIsReadOnly(false);
@@ -162,10 +128,6 @@ export default function AiEnginePage() {
     }
 
     function createCard() {
-        if (!promptContexts.length) {
-            void messageApi.warning('Choose where the shortcut is shown.');
-            return;
-        }
         Logger.log(`edit card=======${inputTitleValue}====${inputValue}====${language}=====${Date.now()}`);
         Logger.log(`showType=======${showType.current}`);
         Logger.log(`SelectedIcon=======${SelectedIcon} ======${SelectedIcon?SelectedIcon.name:''}`);
@@ -175,15 +137,20 @@ export default function AiEnginePage() {
                 return;
             }
             if (inputTitleValue.trim() && inputValue.trim()) {
+                const id = Date.now();
+                // A new prompt is shown in the tab it was created from and archived in the others
+                void setLayout({
+                    ...layout,
+                    [activeScenario]: [...layout[activeScenario], id],
+                    known: [...layout.known, id],
+                });
                 void setCards([...cards, {
-                    id: Date.now(),
+                    id,
                     itemType: PromptTypes.CUSTOM,
                     imageKey: SelectedIcon.name,
                     title: inputTitleValue,
                     text: inputValue.includes(PROMPT_PLACEHOLDER_TEXT) ? inputValue : `${inputValue}${PROMPT_PLACEHOLDER_TEXT}`,
                     language: language,
-                    isSelect: false,
-                    contexts: promptContexts,
                 }]);
                 closeAddPrompt();
             }else {
@@ -204,7 +171,6 @@ export default function AiEnginePage() {
                             text: {$set: inputValue.includes(PROMPT_PLACEHOLDER_TEXT) ? inputValue : `${inputValue}${PROMPT_PLACEHOLDER_TEXT}`},
                             language: {$set: language},
                             imageKey: {$set: imageUri},
-                            contexts: {$set: promptContexts},
                         },
                     }),
                 );
@@ -226,7 +192,6 @@ export default function AiEnginePage() {
             setInputValue(card.text);
             setInputTitleValue(card.title);
             setLanguage(card.language);
-            setPromptContexts(card.contexts ?? ALL_SELECTION_CONTEXTS);
             if (card.itemType === PromptTypes.DEFAULT) {
                 setIsReadOnly(true);
                 setSelectedIcon(undefined);
@@ -298,39 +263,37 @@ export default function AiEnginePage() {
         <div>
             <div
                 className={'bg-white shadow-[0_4px_12px_0px_rgba(0,0,0,.2)] overflow-hidden rounded-tl-[24px] rounded-tr-[24px] px-[56px] py-[32px] mt-[32px] flex flex-col'}>
-                <div className={'text-[#333333] font-[700] text-[20px] justify-start'}>Shortcut Menu</div>
-                <div className={'text-[#5E5E5E] font-[400] text-[12px] justify-start mt-[8px]'}>Customize your menu of
-                    actions by editing, rearranging through dragging, and including custom actions below.
-                    Choose where each shortcut shows: on selected <b>page text</b> (reading) and/or on text selected
-                    in <b>text fields</b> (writing). Pinned shortcuts are shown in the selection toolbar, the others in
-                    its dropdown.
+                <div className={'flex items-center justify-between'}>
+                    <div className={'text-[#333333] font-[700] text-[20px]'}>Prompt Manager</div>
+                    <Button type="primary" icon={<PlusOutlined/>} onClick={() => creatShowModal(true)}
+                        style={{backgroundColor: '#0A4DFE'}}>New Prompt</Button>
                 </div>
-                <div ref={drop}>
-                    {cards.map((card) => (
-                        <Card
-                            key={card.id}
-                            id={`${card.id}`}
-                            text={card.text}
-                            title={card.title}
-                            itemType={card.itemType}
-                            imageKey={card.imageKey}
-                            contexts={card.contexts ?? ALL_SELECTION_CONTEXTS}
-                            pinned={card.isSelect}
-                            toggleContext={toggleContext}
-                            togglePinned={togglePinned}
-                            moveCard={moveCard}
-                            findCard={findCard}
-                            editCard={editCard}
-                            deleteCard={deleteConfirm}
-                        />
-                    ))}
+                <Tabs
+                    className={'mt-[12px]'}
+                    activeKey={activeScenario}
+                    onChange={(key) => setActiveScenario(key as PromptScenario)}
+                    items={PROMPT_SCENARIOS.map(scenario => ({
+                        key: scenario.id,
+                        label: <span className={'text-[15px]'}>
+                            {scenario.label}
+                            <Tooltip title={scenario.help}>
+                                <QuestionCircleOutlined className={'ml-[6px] text-[#8C8C8C]'}/>
+                            </Tooltip>
+                        </span>,
+                    }))}
+                />
+                <div className={'text-[#5E5E5E] text-[13px]'}>
+                    {PROMPT_SCENARIOS.find(scenario => scenario.id === activeScenario)?.help}{' '}
+                    Drag and drop to reorder prompts, or archive those you won&apos;t use here.
                 </div>
-                <div
-                    onClick={() => creatShowModal(true)}
-                    className={'h-[40px] w-fit bg-[#0A4DFE] rounded-[8px] bg-opacity-10 inline-flex flex-row justify-start items-center mt-[32px] px-[16px] cursor-pointer'}>
-                    <img src={IconPlus} className={'h-[15px] w-[15px]'} alt=''/>
-                    <div className={'text-[#0A4DFE] font-[400] text-[15px] ml-[8px]'}>Create new shortcut</div>
-                </div>
+                <PromptBoard
+                    scenario={activeScenario}
+                    cards={cards}
+                    shownIds={layout[activeScenario]}
+                    onChange={(ids) => void setShown(activeScenario, ids)}
+                    onEdit={(card: Card) => editCard(`${card.id}`)}
+                    onDelete={(card: Card) => deleteConfirm(`${card.id}`)}
+                />
                 <div className={'h-[100px] w-full'}/>
             </div>
             <Modal open={isModalOpen} onCancel={() => closeAddPrompt()} width={'734px'} footer={[]} maskClosable={false}
@@ -399,19 +362,6 @@ export default function AiEnginePage() {
                                     </Space>
                                 </Button>
                             </Dropdown>
-                        </div>
-                    </div>
-                    <div className={'h-[1px] w-[620px] bg-[#DADCE0] justify-start'}/>
-                    <div className={'h-[80px] w-[620px] flex flex-row'}>
-                        <div className={'flex flex-col justify-center h-full flex-grow'}>
-                            <div className={'text-[#333333] font-[700] text-[20px] justify-start'}>Show on</div>
-                            <div className={'text-[#5E5E5E] font-[400] text-[13px] justify-start'}>where this shortcut appears in the selection toolbar</div>
-                        </div>
-                        <div className={'flex justify-end items-center'}>
-                            <Checkbox.Group
-                                value={promptContexts}
-                                onChange={(values) => setPromptContexts(ALL_SELECTION_CONTEXTS.filter(c => values.includes(c)))}
-                                options={ALL_SELECTION_CONTEXTS.map(c => ({label: SELECTION_CONTEXT_LABELS[c], value: c}))}/>
                         </div>
                     </div>
                     <div className={'h-[1px] w-[620px] bg-[#DADCE0] justify-start'}/>

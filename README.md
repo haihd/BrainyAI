@@ -22,8 +22,17 @@ The toolbar that appears when you select text adapts to where the text is:
 - **Text fields** (inputs, textareas, rich-text editors): writing actions: Translate, Improve writing, Rephrase,
   Grammar check, plus Make shorter and Professional tone in the dropdown. Password fields are ignored.
 
-In **Options → Shortcut Menu** each shortcut, including your own, has **Page text** / **Text fields** toggles for where
-it appears, and a pin toggle for whether it sits in the toolbar or in its dropdown.
+Choose and order the actions in **Options → Prompt Manager**. It has a tab per place prompts are offered:
+
+| Tab | Where |
+|---|---|
+| **Chat/Ask** | the Ask box (⌘/Ctrl+J) and the side panel chat |
+| **Reading Assistant** | the toolbar on selected page text |
+| **Writing Assistant** | the toolbar on text selected in a text field |
+
+Each tab has a **Show on the list** column (drag to reorder) and an **Archive** column (drag prompts there, or use the
+archive button, to hide them in that tab only). The first 4 prompts (6 in Chat/Ask) are buttons; the others are in the
+dropdown. **New Prompt** adds a prompt to the current tab and archives it in the others.
 
 ### Turning BrainyAI off on a website
 

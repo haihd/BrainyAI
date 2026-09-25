@@ -7,7 +7,7 @@ import {getImageSrc} from "~options/component/Card";
 import {Popover} from "antd";
 import TriangleIcon from "data-base64:~assets/icon_triangle.svg";
 import {Logger} from "~utils/logger";
-import type {SelectionContext} from "~options/constant/SelectionContexts";
+import type {PromptScenario} from "~options/constant/PromptScenarios";
 export type PromptTypesType = typeof PromptTypes[keyof typeof PromptTypes];
 
 export interface Card {
@@ -16,10 +16,11 @@ export interface Card {
     imageKey: string,
     title: string,
     language: string,
-    isSelect: boolean,
+    /** Only used by older versions. */
+    isSelect?: boolean,
     text: string,
-    /** Where the prompt is offered; missing on prompts saved by older versions (treated as everywhere). */
-    contexts?: SelectionContext[],
+    /** Built-in prompts: the scenarios they are shown in by default. */
+    scenarios?: PromptScenario[],
 }
 
 export interface SearchBarProps {
@@ -72,7 +73,7 @@ export const SearchBar = ({ cards, popupPrompt,isVisible,onOpenChange,onItemClic
                 </div>
             </CTooltip>}
             {
-                cards.filter((card) => card.isSelect).map((car) => {
+                cards.map((car) => {
                     const ItemIcon = getIconSrc(car.imageKey);
                     return (
                         <CTooltip key={car.title} title={car.title} {...tooltipProps}>
