@@ -474,7 +474,7 @@ export default function Base() {
                 left: `${toolPositions[0]}px`,
                 top: `${toolPositions[1]}px`,
                 display: showTool ? 'block' : 'none',
-                padding: '8px',
+                padding: '6px',
             }} className={'relative'} onMouseLeave={() => {
                 void closeAsKQuickBtn();
             }}>
@@ -482,17 +482,17 @@ export default function Base() {
                     display: 'flex',
                     flexDirection: 'row',
                 }}
-                className={'bg-white shadow-[0_4px_12px_0px_rgba(0,0,0,.2)] z-[1] overflow-hidden rounded-[8px] h-[32px] py-[4px] items-center'}>
+                className={'bg-white shadow-[0_2px_8px_0px_rgba(0,0,0,.16)] border border-[#0000000F] z-[1] overflow-hidden rounded-[6px] h-[26px] items-center'}>
                     <div
-                        className={'pl-[4px] box-border flex justify-center cursor-pointer items-center'}>
-                        <div className={'flex w-[28px] h-[28px] rounded-[4px] justify-center items-center bg-white hover:bg-[#F2F5FF]'}>
-                            <img onClick={quickBarHeaderClick} className={'block w-[20px] h-[20px] mr-[4px]'}
+                        className={'pl-[2px] box-border flex justify-center cursor-pointer items-center'}>
+                        <div className={'flex w-[22px] h-[22px] rounded-[4px] justify-center items-center bg-white hover:bg-[#F2F5FF]'}>
+                            <img onClick={quickBarHeaderClick} className={'block w-[16px] h-[16px]'}
                                 src={PupHeaderIcon} alt=''/>
                         </div>
-                        <div className={"w-[1px] h-[24px] bg-[#000000] opacity-20 mr-[4px]"}></div>
+                        <div className={"w-[1px] h-[14px] bg-[#000000] opacity-[.12] mx-[3px]"}></div>
                     </div>
                     <div >
-                        <SearchBar cards={cards} popupPrompt={popupPrompt} isVisible={visiblePop ?? false} onOpenChange={(visiblePopup) =>{
+                        <SearchBar compact cards={cards} popupPrompt={popupPrompt} isVisible={visiblePop ?? false} onOpenChange={(visiblePopup) =>{
                             if(visiblePopup) {
                                 selectPopType = 1;
                             }
@@ -502,15 +502,15 @@ export default function Base() {
                             // @ts-expect-error
                             setVisiblePop(visiblePopup);}} onItemClick={(id)=>{goToAskEngine(selectedText,id,null);}} onItemSearchClick={()=>{goToSearch(selectedText);}}/>
                     </div>
-                    <div className={"w-[1px] h-[24px] bg-[#000000] opacity-20 ms-[8px]"}></div>
+                    <div className={"w-[1px] h-[14px] bg-[#000000] opacity-[.12] ms-[4px]"}></div>
 
                     <div onClick={() => {showAskBar();}} className={"cursor-pointer flex justify-center items-center"}>
-                        <img className={'w-[20px] h-[20px] ms-[8px] me-[8px] cursor-pointer'} src={SmallAskAiIcon}
+                        <img className={'w-[16px] h-[16px] ms-[5px] me-[5px] cursor-pointer'} src={SmallAskAiIcon}
                             onMouseEnter={() => {
                                 setVisibleAsk(true);
                             }} alt=''/>
                         {visibleAsk &&
-                            <div className={'text-[#0A4DFE] text-[12px] font-[400] justify-start items-center me-[16px]'}>⌘
+                            <div className={'text-[#0A4DFE] text-[11px] font-[400] justify-start items-center me-[8px] whitespace-nowrap'}>⌘
                                 + J</div>}
                     </div>
 
@@ -519,7 +519,7 @@ export default function Base() {
                     onOpenChange={(isOpen) => {
                         Logger.log(`quickConfigOpen=================${isOpen}`);
                         setQuickConfigOpen(isOpen);}}>
-                    {visibleAsk && <img className={'w-[16px] h-[16px] absolute top-0 right-0 cursor-pointer'} src={askCloseIcon} alt=''
+                    {visibleAsk && <img className={'w-[14px] h-[14px] absolute top-0 right-0 cursor-pointer'} src={askCloseIcon} alt=''
                         onClick={closeTool}/>}
                 </Popover>
             </div>
