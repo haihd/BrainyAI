@@ -1,6 +1,20 @@
 # BrainyAI
 
-Based on BrainAI project, modified API calls to be API Key based (gpt-4o-mini) and support local llm [Ollama](https://ollama.com).
+Based on BrainAI project, modified API calls to be API Key based and support local llm [Ollama](https://ollama.com).
+
+Supported API providers (set the key and model in **Options → API Keys & Models**):
+
+- OpenAI (default model `gpt-4o-mini`)
+- Google Gemini (default model `gemini-2.5-flash`, via Gemini's OpenAI-compatible endpoint)
+- DeepSeek (default model `deepseek-chat`)
+- Custom: any OpenAI-compatible API (OpenRouter, Groq, Mistral, xAI, LM Studio, ...) by base URL
+- Ollama (local)
+
+### Adding another provider
+
+Any provider that implements the OpenAI Chat Completions API only needs a new entry in
+`API_PROVIDERS` in [`libs/chatbot/api/providers.ts`](libs/chatbot/api/providers.ts). The settings page and the
+model picker are generated from that list.
 
 ## Setting
 

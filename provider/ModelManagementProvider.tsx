@@ -15,7 +15,7 @@ import  ChatGPT4Turbo from "~libs/chatbot/openai/ChatGPT4Turbo";
 import {Logger} from "~utils/logger";
 import ChatGPT4O from "~libs/chatbot/openai/ChatGPT4o";
 import ArkoseGlobalSingleton from "~libs/chatbot/openai/Arkose";
-import ChatGPT4oMiniAPI from "~libs/chatbot/openai/ChatGPT4o-miniAPI";
+import {API_BOTS, type ApiBotClass} from "~libs/chatbot/api/ApiBot";
 import OllamaAPI from "~libs/chatbot/openai/OllamaAPI";
 
 export type M = (
@@ -31,7 +31,7 @@ export type M = (
     | typeof Llama3SonarLarge32kOnline
     | typeof ChatGPT4Turbo
     | typeof ChatGPT4O
-    | typeof ChatGPT4oMiniAPI
+    | ApiBotClass
     | typeof OllamaAPI
     )
 
@@ -56,13 +56,17 @@ export const ModelManagementContext = createContext({} as IModelManagementProvid
 export default function ModelManagementProvider({children}) {
     const defaultModels: Ms = [OllamaAPI];
     const [currentBots, setCurrentBots] = useState<IModelManagementProvider['currentBots']>(defaultModels);
-    const allModels = useRef<Ms>([Llama3SonarLarge32KChat, Llama3SonarLarge32kOnline, Claude3Haiku, ChatGPT35Turbo, ChatGPT4O, ChatGPT4Turbo, CopilotBot, KimiBot, Llama370bInstruct, Gemma7bIt, Llavav1634b, Mistral822b]);
+    const allModels = useRef<Ms>([...API_BOTS, OllamaAPI, Llama3SonarLarge32KChat, Llama3SonarLarge32kOnline, Claude3Haiku, ChatGPT35Turbo, ChatGPT4O, ChatGPT4Turbo, CopilotBot, KimiBot, Llama370bInstruct, Gemma7bIt, Llavav1634b, Mistral822b]);
     const storage = new Storage();
     const [isLoaded, setIsLoaded] = useState(false);
     const categoryModels = useRef<CMs>([
+        ...API_BOTS.map(bot => ({
+            label: `${bot.provider.vendor} (API key)`,
+            models: [bot] as Ms
+        })),
         {
             label: "OpenAI",
-            models: [ChatGPT4oMiniAPI, ChatGPT35Turbo, ChatGPT4Turbo, ChatGPT4O]
+            models: [ChatGPT35Turbo, ChatGPT4Turbo, ChatGPT4O]
         },
         {
             label: "Microsoft",

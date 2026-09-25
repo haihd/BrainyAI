@@ -93,19 +93,22 @@ export default class OllamaAPI extends OpenaiBot {
     static async checkIsLogin(): Promise<[ChatError | null, boolean]> {
         const storage = new Storage();
         const ollamaUrl = await storage.get('ollama-url');
-        const response = await fetch(ollamaUrl + '/api/version', {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                'Origin': 'http://localhost',
-            }
-        });
-
-        if (!response.ok) {
-            return Promise.resolve([null, true]);
+        if (!ollamaUrl) {
+            return [null, false];
         }
 
-        return Promise.resolve([null, false]);
+        try {
+            const response = await fetch(ollamaUrl + '/api/version', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Origin': 'http://localhost',
+                }
+            });
+            return [null, response.ok];
+        } catch (e) {
+            return [null, false];
+        }
     }
 
     async completion({prompt, rid, cb, fileRef, file}: BotCompletionParams): Promise<void> {
