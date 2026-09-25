@@ -21,9 +21,19 @@ export interface ApiProviderConfig {
     baseUrl: string;
     /** Whether the user may override the base URL in the settings page. */
     editableBaseUrl?: boolean;
+    /**
+     * Used until the user picks a model. Prefer a "latest" alias where the provider
+     * offers one, so new releases are picked up without a code change.
+     */
     defaultModel: string;
-    /** Suggestions for the model field; any other model id can still be typed. */
+    /** Offline suggestions for the model field. The live list from GET /models is preferred. */
     modelSuggestions: string[];
+    /**
+     * Used to pick a model automatically from the live model list, e.g. when the saved
+     * model has been retired. The first pattern with a match wins; among its matches
+     * the newest-looking id is chosen (see pickRecommendedModel).
+     */
+    preferredModels: RegExp[];
     /** Where the user creates an API key. */
     apiKeyUrl: string;
     apiKeyPlaceholder: string;
@@ -37,8 +47,9 @@ export const API_PROVIDERS: ApiProviderConfig[] = [
         label: "OpenAI API",
         vendor: "OpenAI",
         baseUrl: "https://api.openai.com/v1",
-        defaultModel: "gpt-4o-mini",
-        modelSuggestions: ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1"],
+        defaultModel: "gpt-5-mini",
+        modelSuggestions: ["gpt-5-mini", "gpt-5", "gpt-5-nano"],
+        preferredModels: [/^gpt-\d+(\.\d+)?-mini$/, /^gpt-\d/],
         apiKeyUrl: "https://platform.openai.com/api-keys",
         apiKeyPlaceholder: "sk-...",
         logoSrc: IconOpenAI,
@@ -50,8 +61,10 @@ export const API_PROVIDERS: ApiProviderConfig[] = [
         vendor: "Google",
         // Gemini's OpenAI-compatible endpoint
         baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
-        defaultModel: "gemini-2.5-flash",
-        modelSuggestions: ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro", "gemini-2.0-flash"],
+        // Alias that Google moves to each new Flash release
+        defaultModel: "gemini-flash-latest",
+        modelSuggestions: ["gemini-flash-latest", "gemini-flash-lite-latest"],
+        preferredModels: [/^gemini-flash-latest$/, /^gemini-[\d.]+-flash$/, /flash/],
         apiKeyUrl: "https://aistudio.google.com/apikey",
         apiKeyPlaceholder: "AIza...",
         logoSrc: IconGemini,
@@ -62,8 +75,10 @@ export const API_PROVIDERS: ApiProviderConfig[] = [
         label: "DeepSeek",
         vendor: "DeepSeek",
         baseUrl: "https://api.deepseek.com",
-        defaultModel: "deepseek-chat",
-        modelSuggestions: ["deepseek-chat", "deepseek-reasoner"],
+        // deepseek-chat / deepseek-reasoner were retired on 2026-07-24
+        defaultModel: "deepseek-v4-flash",
+        modelSuggestions: ["deepseek-v4-flash", "deepseek-v4-pro"],
+        preferredModels: [/flash/, /chat/, /^deepseek/],
         apiKeyUrl: "https://platform.deepseek.com/api_keys",
         apiKeyPlaceholder: "sk-...",
         logoSrc: IconDeepSeek,
@@ -78,6 +93,7 @@ export const API_PROVIDERS: ApiProviderConfig[] = [
         editableBaseUrl: true,
         defaultModel: "",
         modelSuggestions: [],
+        preferredModels: [],
         apiKeyUrl: "https://platform.openai.com/docs/api-reference/chat",
         apiKeyPlaceholder: "API key",
         logoSrc: IconApi,
@@ -88,3 +104,5 @@ export const API_PROVIDERS: ApiProviderConfig[] = [
 export const apiKeyStorageKey = (id: string) => `${id}-api-key`;
 export const modelStorageKey = (id: string) => `${id}-model`;
 export const baseUrlStorageKey = (id: string) => `${id}-base-url`;
+/** Cached result of the provider's GET /models. */
+export const modelListStorageKey = (id: string) => `${id}-models`;

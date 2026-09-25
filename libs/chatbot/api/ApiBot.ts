@@ -13,6 +13,7 @@ import {
     baseUrlStorageKey,
     modelStorageKey
 } from "~libs/chatbot/api/providers";
+import {fetchModelList, pickRecommendedModel, readErrorDetail} from "~libs/chatbot/api/models";
 
 interface ApiSettings {
     apiKey: string;
@@ -28,18 +29,40 @@ async function getApiSettings(provider: ApiProviderConfig): Promise<ApiSettings>
     return {apiKey, model, baseUrl: baseUrl.replace(/\/+$/, '')};
 }
 
-async function readErrorDetail(response: Response): Promise<string> {
+async function postChat(baseUrl: string, apiKey: string, model: string, prompt: string): Promise<Response> {
+    return fetch(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+            model,
+            messages: [{role: 'user', content: prompt}],
+            stream: true
+        })
+    });
+}
+
+/**
+ * When the saved model is rejected and is no longer in the provider's model list
+ * (it was retired or renamed), switch to the recommended model and remember it.
+ */
+async function replaceRetiredModel(provider: ApiProviderConfig, {apiKey, model, baseUrl}: ApiSettings): Promise<string | undefined> {
     try {
-        const text = await response.text();
-        try {
-            const json = JSON.parse(text);
-            const err = Array.isArray(json) ? json[0]?.error : json.error;
-            return err?.message ?? text;
-        } catch {
-            return text;
+        const ids = await fetchModelList(provider, apiKey, baseUrl);
+        if (!ids.length || ids.includes(model)) {
+            return undefined;
         }
-    } catch {
-        return '';
+        const replacement = pickRecommendedModel(provider, ids);
+        if (replacement) {
+            Logger.log(`${provider.label}: model ${model} is not available, switching to ${replacement}`);
+            await new Storage().set(modelStorageKey(provider.id), replacement);
+        }
+        return replacement;
+    } catch (e) {
+        Logger.error(`${provider.label}: failed to load the model list`, e);
+        return undefined;
     }
 }
 
@@ -96,8 +119,8 @@ export function createApiBot(provider: ApiProviderConfig) {
         }
 
         static async checkIsLogin(): Promise<[ChatError | null, boolean]> {
-            const {apiKey, model, baseUrl} = await getApiSettings(provider);
-            return [null, !!(apiKey && model && baseUrl)];
+            const {apiKey, baseUrl} = await getApiSettings(provider);
+            return [null, !!(apiKey && baseUrl)];
         }
 
         static async checkModelCanUse(): Promise<boolean> {
@@ -113,25 +136,24 @@ export function createApiBot(provider: ApiProviderConfig) {
         async completion({prompt, rid, cb}: BotCompletionParams): Promise<void> {
             const conversationId = this.botSession.session.botConversationId;
             try {
-                const {apiKey, model, baseUrl} = await getApiSettings(provider);
+                const settings = await getApiSettings(provider);
+                const {apiKey, baseUrl} = settings;
+                // No model chosen (e.g. the custom provider): use the recommended one from the live list
+                const model = settings.model || await replaceRetiredModel(provider, settings);
 
                 if (!apiKey || !model || !baseUrl) {
                     throw new ChatError(ErrorCode.MODEL_INTERNAL_ERROR,
                         `${provider.label} is not configured. Add your API key and model in Settings → API Keys & Models.`);
                 }
 
-                const response = await fetch(`${baseUrl}/chat/completions`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${apiKey}`
-                    },
-                    body: JSON.stringify({
-                        model,
-                        messages: [{role: 'user', content: prompt}],
-                        stream: true
-                    })
-                });
+                let response = await postChat(baseUrl, apiKey, model, prompt);
+
+                if (response.status === 400 || response.status === 404) {
+                    const replacement = await replaceRetiredModel(provider, {apiKey, model, baseUrl});
+                    if (replacement) {
+                        response = await postChat(baseUrl, apiKey, replacement, prompt);
+                    }
+                }
 
                 if (!response.ok) {
                     const detail = await readErrorDetail(response);

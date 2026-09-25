@@ -1,5 +1,6 @@
 import React, {useEffect, useState} from 'react';
-import {AutoComplete, Button, Form, Input, message, Select} from 'antd';
+import {AutoComplete, Button, Form, Input, message, Select, Tooltip} from 'antd';
+import {ReloadOutlined} from '@ant-design/icons';
 import {Storage} from "@plasmohq/storage";
 import {
     API_PROVIDERS,
@@ -9,6 +10,7 @@ import {
     modelStorageKey
 } from "~libs/chatbot/api/providers";
 import {Logger} from "~utils/logger";
+import {fetchModelList, getCachedModelList, pickRecommendedModel} from "~libs/chatbot/api/models";
 
 const OLLAMA_URL_KEY = 'ollama-url';
 const OLLAMA_MODEL_KEY = 'ollama-model';
@@ -26,6 +28,39 @@ export default function ApiKeyPage() {
     const storage = new Storage();
     const [ollamaModels, setOllamaModels] = useState<string[]>([]);
     const [testing, setTesting] = useState<string | null>(null);
+    const [modelLists, setModelLists] = useState<Record<string, string[]>>({});
+    const [loadingModels, setLoadingModels] = useState<Record<string, boolean>>({});
+
+    const providerConnection = (provider: ApiProviderConfig) => ({
+        apiKey: (form.getFieldValue(apiKeyStorageKey(provider.id)) ?? '').trim(),
+        baseUrl: ((provider.editableBaseUrl && form.getFieldValue(baseUrlStorageKey(provider.id))) || provider.baseUrl).trim().replace(/\/+$/, ''),
+    });
+
+    /** Loads the models this key can use from the provider. Returns undefined on failure. */
+    async function loadModelList(provider: ApiProviderConfig, showErrors = true): Promise<string[] | undefined> {
+        const {apiKey, baseUrl} = providerConnection(provider);
+        if (!apiKey || !baseUrl) {
+            if (showErrors) {
+                void message.warning(`Enter the ${provider.label} ${!baseUrl ? 'base URL and ' : ''}API key first.`);
+            }
+            return undefined;
+        }
+
+        setLoadingModels(prev => ({...prev, [provider.id]: true}));
+        try {
+            const ids = await fetchModelList(provider, apiKey, baseUrl);
+            setModelLists(prev => ({...prev, [provider.id]: ids}));
+            return ids;
+        } catch (e) {
+            Logger.error(`Failed to load ${provider.label} models`, e);
+            if (showErrors) {
+                void message.error(`${provider.label}: ${e.message}`.slice(0, 300));
+            }
+            return undefined;
+        } finally {
+            setLoadingModels(prev => ({...prev, [provider.id]: false}));
+        }
+    }
 
     async function loadOllamaModels(url?: string) {
         const ollamaUrl = url || await storage.get(OLLAMA_URL_KEY) || 'http://localhost:11434';
@@ -45,6 +80,17 @@ export default function ApiKeyPage() {
             values[key] = await storage.get(key);
         }
         form.setFieldsValue(values);
+
+        const cached: Record<string, string[]> = {};
+        for (const provider of API_PROVIDERS) {
+            cached[provider.id] = await getCachedModelList(provider);
+        }
+        setModelLists(cached);
+
+        // Refresh in the background so newly released models show up without any action.
+        for (const provider of API_PROVIDERS) {
+            void loadModelList(provider, false);
+        }
     }
 
     useEffect(() => {
@@ -52,37 +98,25 @@ export default function ApiKeyPage() {
         void loadSettings();
     }, []);
 
+    /** Checks the key by listing models (free, and works for every model family) and that the chosen model exists. */
     async function testProvider(provider: ApiProviderConfig) {
-        const apiKey = form.getFieldValue(apiKeyStorageKey(provider.id));
-        const baseUrl = ((provider.editableBaseUrl && form.getFieldValue(baseUrlStorageKey(provider.id))) || provider.baseUrl).replace(/\/+$/, '');
-        const model = form.getFieldValue(modelStorageKey(provider.id)) || provider.defaultModel;
-        if (!apiKey || !baseUrl || !model) {
-            void message.warning(`Enter the ${provider.label} ${!baseUrl ? 'base URL, ' : ''}API key and model first.`);
-            return;
-        }
-
         setTesting(provider.id);
         try {
-            const response = await fetch(`${baseUrl}/chat/completions`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}`},
-                body: JSON.stringify({model, messages: [{role: 'user', content: 'Reply with OK'}], max_tokens: 5}),
-            });
-            if (response.ok) {
-                void message.success(`${provider.label}: connection OK (${model}).`);
-            } else {
-                const text = await response.text();
-                let detail = text;
-                try {
-                    const json = JSON.parse(text);
-                    detail = (Array.isArray(json) ? json[0]?.error : json.error)?.message ?? text;
-                } catch {
-                    // keep raw text
-                }
-                void message.error(`${provider.label}: HTTP ${response.status} ${detail}`.slice(0, 300));
+            const ids = await loadModelList(provider);
+            if (!ids) {
+                return;
             }
-        } catch (e) {
-            void message.error(`${provider.label}: ${e.message}`);
+
+            const model = form.getFieldValue(modelStorageKey(provider.id)) || provider.defaultModel;
+            if (!model) {
+                void message.success(`${provider.label}: key OK, ${ids.length} models available. Pick one in the Model field.`);
+            } else if (ids.includes(model)) {
+                void message.success(`${provider.label}: key OK, ${model} is available.`);
+            } else {
+                const recommended = pickRecommendedModel(provider, ids);
+                void message.warning(`${provider.label}: key OK, but ${model} is not in your model list.` +
+                    (recommended ? ` Try ${recommended}.` : ''), 6);
+            }
         } finally {
             setTesting(null);
         }
@@ -133,20 +167,13 @@ export default function ApiKeyPage() {
                                         <Input placeholder="https://.../v1"/>
                                     </Form.Item>}
                                 <Form.Item label="API Key" name={apiKeyStorageKey(provider.id)}>
-                                    <Input.Password placeholder={provider.apiKeyPlaceholder} autoComplete="off"/>
+                                    <Input.Password placeholder={provider.apiKeyPlaceholder} autoComplete="off"
+                                        onBlur={() => void loadModelList(provider, false)}/>
                                 </Form.Item>
-                                <div className={'flex items-end gap-[12px]'}>
-                                    <Form.Item label="Model" name={modelStorageKey(provider.id)} className={'flex-1'}>
-                                        <AutoComplete
-                                            options={provider.modelSuggestions.map(m => ({value: m}))}
-                                            placeholder={provider.defaultModel || 'model id'}
-                                            filterOption={(input, option) => (option?.value ?? '').toLowerCase().includes(input.toLowerCase())}
-                                        />
-                                    </Form.Item>
-                                    <Form.Item>
-                                        <Button loading={testing === provider.id} onClick={() => testProvider(provider)}>Test</Button>
-                                    </Form.Item>
-                                </div>
+                                <ModelField provider={provider} models={modelLists[provider.id] ?? []}
+                                    loading={!!loadingModels[provider.id]} testing={testing === provider.id}
+                                    onRefresh={() => loadModelList(provider)} onTest={() => testProvider(provider)}
+                                    onUseModel={(model) => form.setFieldValue(modelStorageKey(provider.id), model)}/>
                             </div>
                         ))}
 
@@ -182,4 +209,49 @@ export default function ApiKeyPage() {
             </div>
         </div>
     );
+}
+
+interface ModelFieldProps {
+    provider: ApiProviderConfig;
+    models: string[];
+    loading: boolean;
+    testing: boolean;
+    onRefresh: () => void;
+    onTest: () => void;
+    onUseModel: (model: string) => void;
+}
+
+function ModelField({provider, models, loading, testing, onRefresh, onTest, onUseModel}: ModelFieldProps) {
+    const recommended = models.length ? pickRecommendedModel(provider, models) : undefined;
+    const suggestions = models.length ? models : provider.modelSuggestions;
+    const selected: string | undefined = Form.useWatch(modelStorageKey(provider.id));
+    const current = selected || provider.defaultModel;
+    const missing = !!current && models.length > 0 && !models.includes(current);
+
+    const extra = models.length
+        ? <span>
+            {models.length} models available from {provider.vendor}.
+            {recommended && recommended !== current && <> Recommended: <a onClick={() => onUseModel(recommended)}>{recommended}</a>.</>}
+            {missing && <span className={'text-[#D46B08]'}> {current} is not in this list; it may be retired.</span>}
+        </span>
+        : `Enter your API key to load the model list from ${provider.vendor}. Leave empty to use ${provider.defaultModel || 'the recommended model'}.`;
+
+    return <div className={'flex items-start gap-[12px]'}>
+        <Form.Item label="Model" name={modelStorageKey(provider.id)} className={'flex-1'} extra={extra}>
+            <AutoComplete
+                allowClear
+                options={suggestions.map(m => ({value: m, label: m === recommended ? `${m}  (recommended)` : m}))}
+                placeholder={provider.defaultModel || recommended || 'model id'}
+                filterOption={(input, option) => (option?.value ?? '').toLowerCase().includes(input.toLowerCase())}
+            />
+        </Form.Item>
+        <Form.Item label=" ">
+            <div className={'flex gap-[8px]'}>
+                <Tooltip title="Reload the model list from the provider">
+                    <Button icon={<ReloadOutlined/>} loading={loading} onClick={onRefresh}/>
+                </Tooltip>
+                <Button loading={testing} onClick={onTest}>Test</Button>
+            </div>
+        </Form.Item>
+    </div>;
 }

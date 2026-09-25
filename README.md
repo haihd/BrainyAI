@@ -4,11 +4,21 @@ Based on BrainAI project, modified API calls to be API Key based and support loc
 
 Supported API providers (set the key and model in **Options → API Keys & Models**):
 
-- OpenAI (default model `gpt-4o-mini`)
-- Google Gemini (default model `gemini-2.5-flash`, via Gemini's OpenAI-compatible endpoint)
-- DeepSeek (default model `deepseek-chat`)
+- OpenAI (default model `gpt-5-mini`)
+- Google Gemini (default model `gemini-flash-latest`, an alias Google moves to each new Flash release)
+- DeepSeek (default model `deepseek-v4-flash`)
 - Custom: any OpenAI-compatible API (OpenRouter, Groq, Mistral, xAI, LM Studio, ...) by base URL
 - Ollama (local)
+
+### New model releases
+
+You don't need to update the extension when a provider releases a model:
+
+- The Model field lists the models your key can use, loaded live from the provider's `GET /models`
+  (refreshed every time the settings page opens), with the recommended one marked.
+- Leaving the Model field empty uses the provider's default, which is a "latest" alias where one exists.
+- If the saved model is retired, the next chat request detects it, switches to the recommended model
+  from the live list, and saves it.
 
 ### Adding another provider
 
