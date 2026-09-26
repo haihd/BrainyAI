@@ -13,6 +13,9 @@
     .title {
         @apply flex items-center text-gray-800 font-bold text-sm;
     }
+    .titleContext {
+        @apply ml-[4px] text-[#8C8C8C] font-[400] text-[12px];
+    }
 
     .iconImage {
         @apply w-[20px] h-[20px];
@@ -52,9 +55,24 @@
 }
 
 .popupQuickConfig {
-    @apply w-[224px] max-h-[127px] min-h-[86px] flex flex-col justify-center items-start;
-    & > div {
-        @apply h-[40px] flex w-[100%] justify-start items-center text-[#5E5E5E] text-[15px] font-[400] pl-[16px] cursor-pointer hover:bg-[#F2F5FF] box-border;
+    @apply w-[236px] flex flex-col items-stretch box-border;
+    .menuTitle {
+        @apply px-[12px] pt-[2px] pb-[6px] text-[12px] font-[500] text-[#8C8C8C];
+    }
+    .menuItem {
+        @apply flex flex-col px-[12px] py-[6px] cursor-pointer hover:bg-[#F2F5FF] box-border;
+    }
+    .menuLabel {
+        @apply text-[13px] leading-[18px] text-[#333333] font-[400];
+    }
+    .menuSub {
+        @apply text-[11px] leading-[16px] text-[#8C8C8C] truncate;
+    }
+    .menuLink {
+        @apply text-[#0A4DFE] cursor-pointer hover:underline;
+    }
+    .menuFooter {
+        @apply mt-[4px] px-[12px] pt-[6px] text-[11px] leading-[16px] text-[#8C8C8C] border-0 border-t border-solid border-[#F0F0F0];
     }
 }
 

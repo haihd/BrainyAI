@@ -5,7 +5,7 @@ import IconShortcut from "data-base64:~assets/icon_shortcut.svg";
 import IconShortcutSelected from "data-base64:~assets/icon_shortcut_selected.svg";
 import IconApiKey from "data-base64:~assets/icon_shortcut.svg";
 import IconApiKeySelected from "data-base64:~assets/icon_shortcut_selected.svg";
-import {PATH_SETTING_SHORTCUT, PATH_SETTING_APIKEY} from "~options/router";
+import {PATH_SETTING_SHORTCUT, PATH_SETTING_APIKEY, PATH_SETTING_WEBSITES} from "~options/router";
 
 export default function Layout() {
     const n = useNavigate();
@@ -43,15 +43,23 @@ export default function Layout() {
                                         isSelected={selected === 'ContactUs'}/>*/}
                 <ImageTextComponent onClick={() => handleClick({id: 'Shortcut', path: PATH_SETTING_SHORTCUT})}
                     imageSrc={IconShortcut} imageSrcSelected={IconShortcutSelected}
-                    text={'Shortcut Menu'} className={''}
+                    text={'Prompt Manager'} className={''}
                     isSelected={selected === 'Shortcut'}/>
                 <ImageTextComponent 
                     onClick={() => handleClick({id: 'ApiKey', path: PATH_SETTING_APIKEY})}
                     imageSrc={IconApiKey} 
                     imageSrcSelected={IconApiKeySelected}
-                    text={'API Key & Ollama'} 
+                    text={'API Keys & Models'} 
                     className={'mt-[24px]'}
                     isSelected={selected === 'ApiKey'}
+                />
+                <ImageTextComponent
+                    onClick={() => handleClick({id: 'Websites', path: PATH_SETTING_WEBSITES})}
+                    imageSrc={IconApiKey}
+                    imageSrcSelected={IconApiKeySelected}
+                    text={'Websites'}
+                    className={'mt-[24px]'}
+                    isSelected={selected === 'Websites'}
                 />
             </div>
         </div>

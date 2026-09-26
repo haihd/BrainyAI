@@ -2,7 +2,7 @@ import type {PlasmoCSConfig, PlasmoGetStyle} from "plasmo";
 import styleText from 'data-text:~base.scss';
 import baseContentStyleText from 'data-text:~style/base-content.module.scss';
 import * as baseContentStyle from '~style/base-content.module.scss';
-import React, {useEffect, useRef, useState} from "react";
+import React, {useEffect, useMemo, useRef, useState} from "react";
 import {
     getLatestState,
     MESSAGE_ACTION_SET_PANEL_OPEN_OR_NOT,
@@ -14,24 +14,24 @@ import {
 import Icon from "data-base64:~assets/icon.png";
 import AskEditIcon from "data-base64:~assets/icon_ask_content_edit.svg";
 import CTooltip from "~component/common/CTooltip";
-import {useStorage} from "@plasmohq/storage/dist/hook";
-import {PromptDatas} from "~options/constant/PromptDatas";
 import {Input, List, Popover} from "antd";
 import {PromptTypes} from "~options/constant/PromptTypes";
 import {getIconSrc} from "~options/component/AiEnginePage";
 import {getImageSrc} from "~options/component/Card";
 import popupSettingIcon from "data-base64:~assets/icon_popup_setting.svg";
-import DingSelectIcon from "data-base64:~assets/icon_ding_select.svg";
-import DingUnSelectIcon from "data-base64:~assets/icon_ding_unselect.svg";
-import update from "immutability-helper";
 import SmallAskAiIcon from "data-base64:~assets/icon_ask_ai_small.svg";
 import askCloseIcon from "data-base64:~assets/icon_ask_close.svg";
-import {IAskAi, openPanelAskAi, openPanelSearchInContent} from "~libs/open-ai/open-panel";
+import {IAskAi, openPanelAskAi, openPanelSearchInContent, openPanelTranslate} from "~libs/open-ai/open-panel";
+import {TRANSLATE_PROMPT_ID} from "~options/constant/PromptDatas";
 import SearchBannerIcon from "data-base64:~assets/icon_search_banner.svg";
 import PupHeaderIcon from "data-base64:~assets/icon_pup_header.svg";
 import {SearchBar} from "~options/component/SearchBar";
 import {Logger} from "~utils/logger";
 import {BASE_ZINDEX} from "~component/common/CPopover";
+import {disableSite, isSiteDisabled, setDisabledAllSites, useSiteAccess} from "~utils/site-access";
+import {usePromptLibrary} from "~utils/prompt-cards";
+import {type SelectionContext, SelectionContexts} from "~options/constant/SelectionContexts";
+import {PROMPT_SCENARIOS, PromptScenarios} from "~options/constant/PromptScenarios";
 
 export const getStyle: PlasmoGetStyle = () => {
     const style = document.createElement("style");
@@ -68,7 +68,65 @@ let popIsShowByShortcuts = false;
  */
 let selectPopType = 1;
 
-let tempHostNames:string[] = [];
+/**
+ * BrainyAI is turned off on this page (Disable on this website / on all websites).
+ * Module-level so the page event listeners, registered once, see the current value.
+ */
+let pageDisabled = true;
+/** The "Hide BrainyAI" menu is open; clicks in it must not close the quick bar. */
+let disableMenuShown = false;
+
+// Input types whose text can be selected (password is deliberately excluded)
+const TEXT_INPUT_TYPES = new Set(['text', 'search', 'url', 'email', 'tel', '']);
+
+interface PageSelection {
+    text: string;
+    context: SelectionContext;
+    /** Viewport rectangle to place the quick bar under. */
+    anchor: { left: number, bottom: number };
+}
+
+/**
+ * Reads the current selection. Text selected inside <input>/<textarea> is not part of
+ * window.getSelection(), so it is read from the focused field instead.
+ */
+function readPageSelection(mouse?: MouseEvent): PageSelection | null {
+    const active = document.activeElement;
+    if (active instanceof HTMLInputElement && !TEXT_INPUT_TYPES.has(active.type)) {
+        // password, number, date... fields: never offer the quick bar
+        return null;
+    }
+    const isTextField = active instanceof HTMLTextAreaElement || active instanceof HTMLInputElement;
+
+    if (isTextField) {
+        const field = active as HTMLInputElement | HTMLTextAreaElement;
+        const {selectionStart, selectionEnd} = field;
+        if (selectionStart == null || selectionEnd == null || selectionEnd <= selectionStart) {
+            return null;
+        }
+        const text = field.value.slice(selectionStart, selectionEnd).trim();
+        const rect = field.getBoundingClientRect();
+        // There is no rectangle for text inside a field; use the pointer, else the field itself
+        const anchor = mouse
+            ? {left: mouse.clientX - 12, bottom: mouse.clientY + 6}
+            : {left: rect.left, bottom: rect.bottom};
+        return text ? {text, context: SelectionContexts.EDITABLE, anchor} : null;
+    }
+
+    const selection = window.getSelection();
+    const text = selection?.toString().trim();
+    if (!selection || selection.isCollapsed || !text) {
+        return null;
+    }
+    const node = selection.anchorNode;
+    const element = node instanceof HTMLElement ? node : node?.parentElement;
+    const rect = selection.getRangeAt(0).getBoundingClientRect();
+    return {
+        text,
+        context: element?.isContentEditable ? SelectionContexts.EDITABLE : SelectionContexts.TEXT,
+        anchor: {left: rect.left, bottom: rect.bottom},
+    };
+}
 
 export default function Base() {
     const [toolPositions, setToolPositions] = useState([0, 0]); // [x, y]
@@ -84,39 +142,42 @@ export default function Base() {
      * quick bar Keyboard shortcuts is show?
      */
     const [visibleAsk, setVisibleAsk] = useState(false);
-    const [cards, setCards] = useStorage('promptData', PromptDatas);
-    const [quickConfigOpen, setQuickConfigOpen] = useState(false);
-    const [closeHostNames, setCloseHostNames] = useStorage<string[]>('CloseHostNamesData', []);
-    const appendCloseHostName = (newHostName: string) => {
-        setCloseHostNames(prevNames => {
-            if (!prevNames?.includes(newHostName)) {
-                return [...prevNames ?? [], newHostName];
-            }
-            return prevNames;
-        }).then(() => {
-            Logger.log('newHostName add success:=========', closeHostNames);
-        });
-    };
+    const {cards, shown, slots} = usePromptLibrary();
+    const [selectionContext, setSelectionContext] = useState<SelectionContext>(SelectionContexts.TEXT);
+    // Page text -> Reading Assistant prompts, text fields -> Writing Assistant prompts
+    const scenario = selectionContext === SelectionContexts.EDITABLE ? PromptScenarios.WRITING : PromptScenarios.READING;
+    const contextCards = useMemo(() => shown(scenario), [shown, scenario]);
+    const askCards = useMemo(() => shown(PromptScenarios.ASK), [shown]);
+    const [disableMenuOpen, setDisableMenuOpen] = useState(false);
+    const [barHovered, setBarHovered] = useState(false);
+    const siteAccess = useSiteAccess();
+    const hostname = window.location.hostname;
+    const disabledHere = !siteAccess.loaded || isSiteDisabled(siteAccess, hostname);
 
-    const appendTempCloseHostName = (newHostName: string) => {
-        if (!tempHostNames.includes(newHostName)) {
-            tempHostNames = [...tempHostNames, newHostName];
-            Logger.log('newTempHostName add success: ', newHostName);
+    useEffect(() => {
+        pageDisabled = disabledHere;
+        if (disabledHere) {
+            // Hide everything, but leave the page's own text selection alone
+            setShowTool(false);
+            setShowAskSearch(false);
+            setDisableMenuOpen(false);
+            disableMenuShown = false;
         }
-    };
+    }, [disabledHere]);
 
-    function checkSelection() {
-        const selection = window.getSelection();
-        const selectionText = selection?.toString().trim();
+    function checkSelection(mouse?: MouseEvent) {
+        if (pageDisabled) {
+            return;
+        }
+        const pageSelection = readPageSelection(mouse);
 
-        if (!selection?.isCollapsed && selectionText && selectionText.trim()){
-            Logger.log('selectionText================', selectionText);
+        if (pageSelection) {
+            const {text: selectionText, context, anchor} = pageSelection;
+            Logger.log('selectionText================', context, selectionText);
             setSelectedText(selectionText);
-            const range = selection?.getRangeAt(0);
+            setSelectionContext(context);
 
-            const rect = range?.getBoundingClientRect();
-
-            let x = (rect?.left ?? 0) + window.scrollX;
+            let x = anchor.left + window.scrollX;
 
             let toolTipWidth = 280;
 
@@ -128,13 +189,13 @@ export default function Base() {
                 x = window.innerWidth - toolTipWidth - 10;
             }
 
-            setToolPositions([x, (rect?.bottom ?? 0) + window.scrollY + 10]);
+            setToolPositions([Math.max(x, 0), anchor.bottom + window.scrollY + 10]);
             void chrome.runtime.sendMessage({action: MESSAGE_ACTION_SET_QUOTING_SELECTION_TEXT, data:selectionText});
             void showToolByConfig();
             setVisibleAsk(false);
             setShowAskSearch(false);
         } else {
-            if(!popIsShowByShortcuts){
+            if(!popIsShowByShortcuts && !disableMenuShown){
                 setShowTool(false);
                 sendMessageQuotingCancel();
             }
@@ -142,24 +203,15 @@ export default function Base() {
     }
 
     async function showToolByConfig(){
-        const hostname = window.location.hostname;
-        const hostNames = await getLatestState(setCloseHostNames);
-        Logger.log('hostname================', hostname);
-        Logger.log('closeHostNames================', hostNames);
-        Logger.log('!closeHostNames.includes(hostname)======',!hostNames?.includes(hostname));
-        if (!hostNames?.includes(hostname) && !tempHostNames.includes(hostname)) {
+        if (!pageDisabled) {
             setShowTool(true);
         }
     }
 
-    async function closeAsKQuickBtn(){
-        const quickConfigOpen = await getLatestState(setQuickConfigOpen);
-        if(!quickConfigOpen){
-            setVisibleAsk(false);
-        }
-    }
-
     function showAskBar(isSelectText = false) {
+        if (pageDisabled) {
+            return;
+        }
         if(isSelectText){
             setShowAskContent(true);
         }else {
@@ -179,12 +231,6 @@ export default function Base() {
 
     const sendMessageQuotingCancel = function () {
         void chrome.runtime.sendMessage({action: MESSAGE_ACTION_SET_QUOTING_CANCEL});
-    };
-
-    const closeTool = function (e: React.MouseEvent<HTMLImageElement, MouseEvent>) {
-        e.stopPropagation();
-        setShowTool(false);
-        sendMessageQuotingCancel();
     };
 
     const askBarContentCopy = function (e: React.MouseEvent<HTMLImageElement, MouseEvent>) {
@@ -261,7 +307,10 @@ export default function Base() {
             if(cardId){
                 Logger.log(`goToAskEngine===============${msg}`);
                 const card = cards.find((card) => card.id === cardId);
-                if (card != null) {
+                if (card?.id === TRANSLATE_PROMPT_ID) {
+                    // The built-in Translate prompt opens the Translate page (which keeps its own target language)
+                    openPanelTranslate(mergeAiMsg(msg, quotingText));
+                } else if (card != null) {
                     const iAskAI = new IAskAi({
                         prompt: card.text,
                         lang: card.language,
@@ -307,14 +356,14 @@ export default function Base() {
         Logger.log('chrome.runtime.onMessage.addListener============');
         chrome.runtime.onMessage.addListener(handleMessage);
         if (!openInPlugin(location.href)) {
-            document.body.addEventListener('mouseup', () => {
+            document.body.addEventListener('mouseup', (e) => {
                 Logger.log(`mouseup ===============${showAskSearch}`);
-                setTimeout(() => checkSelection());
+                setTimeout(() => checkSelection(e));
             });
 
             document.body.addEventListener('mousedown', () => {
                 Logger.log(`addEventListener mousedown ===============`);
-                if(!popIsShowByShortcuts){
+                if(!popIsShowByShortcuts && !disableMenuShown){
                     Logger.log(`mousedown popIsShowByShortcuts=============${popIsShowByShortcuts}`);
                     setShowTool(false);
                     sendMessageQuotingCancel();
@@ -327,6 +376,9 @@ export default function Base() {
             });
 
             document.body.addEventListener('keydown', (e) => {
+                if (pageDisabled && !((e.metaKey || e.ctrlKey) && e.key === 'i')) {
+                    return;
+                }
                 if (e.shiftKey && e.metaKey && e.key === 'Enter') {
                     Logger.log('viewGroup shiftKey and metaKey and Enter ==============');
                     goToSearchByAskBar().then(() => {
@@ -366,14 +418,17 @@ export default function Base() {
     const popupPrompt =  (
         <div className={baseContentStyle.popupPrompt}>
             <div className={baseContentStyle.header}>
-                <div className={baseContentStyle.title} >Shortcut Menu</div>
+                <div className={baseContentStyle.title} >
+                    Shortcut Menu
+                    <span className={baseContentStyle.titleContext}> · {PROMPT_SCENARIOS.find(item => item.id === (selectPopType == 1 ? scenario : PromptScenarios.ASK))?.label}</span>
+                </div>
                 <img className={baseContentStyle.iconImage} src={popupSettingIcon} alt='' onClick={() => {
                     window.open(`chrome-extension://${chrome.runtime.id}/options.html`);
                 }}/>
             </div>
             <List
                 itemLayout="vertical"
-                dataSource={cards}
+                dataSource={selectPopType == 1 ? contextCards : askCards}
                 bordered={false}
                 split={false}
                 className={`hideScrollBar ${baseContentStyle.listWrap}`}
@@ -388,11 +443,6 @@ export default function Base() {
                                         <img className={baseContentStyle.leadingIcon} src={getImageSrc(car.imageKey)} alt={''}/>}
                                     <div className={baseContentStyle.leadingText}>{car.title}</div>
                                 </div>
-                                <img className={baseContentStyle.pinIcon}
-                                    src={car.isSelect?DingSelectIcon:DingUnSelectIcon} alt='' onClick={(e) =>{
-                                        e.stopPropagation();
-                                        setPromptIsDisplay(car,index,e);
-                                    }}/>
                             </div>
                         </List.Item>
                     );
@@ -402,22 +452,37 @@ export default function Base() {
         </div>
     );
 
-    const dealQuickBarVisibleConfig =  function (e: React.MouseEvent<HTMLElement, MouseEvent>, type: number) {
+    async function disableBrainyAI(e: React.MouseEvent<HTMLElement, MouseEvent>, scope: 'site' | 'all') {
         e.stopPropagation();
-        Logger.log('dealQuickBarVisibleConfig================', type);
-        const currentDomain = window.location.hostname;
-        if(type == 1){
-            appendTempCloseHostName(currentDomain);
-        }else if(type == 2){
-            appendCloseHostName(currentDomain);
+        setDisableMenuOpen(false);
+        disableMenuShown = false;
+        if (scope === 'site') {
+            await disableSite(hostname);
+        } else {
+            await setDisabledAllSites(true);
         }
-        setQuickConfigOpen(false);
-    };
+        Logger.log(`BrainyAI disabled on ${scope === 'site' ? hostname : 'all websites'}`);
+    }
 
-    const popupQuickPromptConfig = (
-        <div className={baseContentStyle.popupQuickConfig}>
-            <div onClick={(e) => dealQuickBarVisibleConfig(e,1)}>Hide until Next visit</div>
-            <div onClick={(e) => dealQuickBarVisibleConfig(e,2)}>Disable for this site</div>
+    const disableMenu = (
+        // preventDefault keeps the page's text selection when an option is clicked
+        <div className={baseContentStyle.popupQuickConfig} onMouseDown={(e) => e.preventDefault()}>
+            <div className={baseContentStyle.menuTitle}>Hide BrainyAI</div>
+            <div className={baseContentStyle.menuItem} onClick={(e) => disableBrainyAI(e, 'site')}>
+                <span className={baseContentStyle.menuLabel}>Disable on this website</span>
+                <span className={baseContentStyle.menuSub}>{hostname}</span>
+            </div>
+            <div className={baseContentStyle.menuItem} onClick={(e) => disableBrainyAI(e, 'all')}>
+                <span className={baseContentStyle.menuLabel}>Disable on all websites</span>
+            </div>
+            <div className={baseContentStyle.menuFooter}>
+                Turn it back on in <a className={baseContentStyle.menuLink} onClick={(e) => {
+                    e.stopPropagation();
+                    setDisableMenuOpen(false);
+                    disableMenuShown = false;
+                    window.open(`chrome-extension://${chrome.runtime.id}/options.html`);
+                }}>Settings → Websites</a>.
+            </div>
         </div>
     );
 
@@ -431,18 +496,6 @@ export default function Base() {
         }
         Logger.log('itemClick===============', car.id, index, msg);
         goToAskEngine(msg,car.id,undefined);
-    }
-
-    function setPromptIsDisplay(car: any, index: number,e: React.MouseEvent<HTMLImageElement>) {
-        e.stopPropagation();
-        Logger.log('setPromptIsDisplay===============', car, index);
-        void setCards(
-            update(cards, {
-                [index]: {
-                    isSelect: {$set: !car.isSelect},
-                },
-            }),
-        );
     }
 
     const handleKeyDown = (e) => {
@@ -468,31 +521,38 @@ export default function Base() {
         }
     };
 
+    if (disabledHere) {
+        return null;
+    }
+
     return <div>
         {
             <div ref={divRef} style={{
                 left: `${toolPositions[0]}px`,
                 top: `${toolPositions[1]}px`,
                 display: showTool ? 'block' : 'none',
-                padding: '8px',
-            }} className={'relative'} onMouseLeave={() => {
-                void closeAsKQuickBtn();
+                padding: '6px',
+            }} className={'relative'}
+            onMouseEnter={() => setBarHovered(true)}
+            onMouseLeave={() => {
+                setBarHovered(false);
+                setVisibleAsk(false);
             }}>
                 <div style={{
                     display: 'flex',
                     flexDirection: 'row',
                 }}
-                className={'bg-white shadow-[0_4px_12px_0px_rgba(0,0,0,.2)] z-[1] overflow-hidden rounded-[8px] h-[32px] py-[4px] items-center'}>
+                className={'bg-white shadow-[0_2px_8px_0px_rgba(0,0,0,.16)] border border-[#0000000F] z-[1] overflow-hidden rounded-[6px] h-[26px] items-center'}>
                     <div
-                        className={'pl-[4px] box-border flex justify-center cursor-pointer items-center'}>
-                        <div className={'flex w-[28px] h-[28px] rounded-[4px] justify-center items-center bg-white hover:bg-[#F2F5FF]'}>
-                            <img onClick={quickBarHeaderClick} className={'block w-[20px] h-[20px] mr-[4px]'}
+                        className={'pl-[2px] box-border flex justify-center cursor-pointer items-center'}>
+                        <div className={'flex w-[22px] h-[22px] rounded-[4px] justify-center items-center bg-white hover:bg-[#F2F5FF]'}>
+                            <img onClick={quickBarHeaderClick} className={'block w-[16px] h-[16px]'}
                                 src={PupHeaderIcon} alt=''/>
                         </div>
-                        <div className={"w-[1px] h-[24px] bg-[#000000] opacity-20 mr-[4px]"}></div>
+                        <div className={"w-[1px] h-[14px] bg-[#000000] opacity-[.12] mx-[3px]"}></div>
                     </div>
                     <div >
-                        <SearchBar cards={cards} popupPrompt={popupPrompt} isVisible={visiblePop ?? false} onOpenChange={(visiblePopup) =>{
+                        <SearchBar compact cards={contextCards.slice(0, slots(scenario))} showSearch={selectionContext === SelectionContexts.TEXT} popupPrompt={popupPrompt} isVisible={visiblePop ?? false} onOpenChange={(visiblePopup) =>{
                             if(visiblePopup) {
                                 selectPopType = 1;
                             }
@@ -502,25 +562,33 @@ export default function Base() {
                             // @ts-expect-error
                             setVisiblePop(visiblePopup);}} onItemClick={(id)=>{goToAskEngine(selectedText,id,null);}} onItemSearchClick={()=>{goToSearch(selectedText);}}/>
                     </div>
-                    <div className={"w-[1px] h-[24px] bg-[#000000] opacity-20 ms-[8px]"}></div>
+                    <div className={"w-[1px] h-[14px] bg-[#000000] opacity-[.12] ms-[4px]"}></div>
 
                     <div onClick={() => {showAskBar();}} className={"cursor-pointer flex justify-center items-center"}>
-                        <img className={'w-[20px] h-[20px] ms-[8px] me-[8px] cursor-pointer'} src={SmallAskAiIcon}
+                        <img className={'w-[16px] h-[16px] ms-[5px] me-[5px] cursor-pointer'} src={SmallAskAiIcon}
                             onMouseEnter={() => {
                                 setVisibleAsk(true);
                             }} alt=''/>
                         {visibleAsk &&
-                            <div className={'text-[#0A4DFE] text-[12px] font-[400] justify-start items-center me-[16px]'}>⌘
+                            <div className={'text-[#0A4DFE] text-[11px] font-[400] justify-start items-center me-[8px] whitespace-nowrap'}>⌘
                                 + J</div>}
                     </div>
 
                 </div>
-                <Popover zIndex={BASE_ZINDEX+100} overlayInnerStyle={{paddingLeft: 0, paddingRight:0,paddingTop:'8px',paddingBottom:'8px'}} title={null} content={popupQuickPromptConfig} arrow={false} placement='bottomLeft' open={quickConfigOpen}
-                    onOpenChange={(isOpen) => {
-                        Logger.log(`quickConfigOpen=================${isOpen}`);
-                        setQuickConfigOpen(isOpen);}}>
-                    {visibleAsk && <img className={'w-[16px] h-[16px] absolute top-0 right-0 cursor-pointer'} src={askCloseIcon} alt=''
-                        onClick={closeTool}/>}
+                <Popover zIndex={BASE_ZINDEX+100} overlayInnerStyle={{padding: '6px 0'}} title={null} content={disableMenu}
+                    arrow={false} placement='rightTop' align={{offset: [6, -4]}} trigger='click' open={disableMenuOpen}
+                    onOpenChange={(open) => {
+                        disableMenuShown = open;
+                        setDisableMenuOpen(open);
+                    }}>
+                    <img className={'w-[14px] h-[14px] absolute top-0 right-0 cursor-pointer'}
+                        style={{visibility: barHovered || disableMenuOpen ? 'visible' : 'hidden'}}
+                        title={'Disable BrainyAI'} src={askCloseIcon} alt='Disable BrainyAI'
+                        onMouseDown={(e) => {
+                            // keep the page selection and the quick bar while the menu opens
+                            e.preventDefault();
+                            e.stopPropagation();
+                        }}/>
                 </Popover>
             </div>
         }
@@ -584,7 +652,7 @@ export default function Base() {
                 <div className={'flex flex-row justify-between mt-[8px] me-[16px] items-center mb-[8px]'}>
                     <div
                         className={'h-[25px] text-[#C2C2C2] bg-[#F3F4F9] rounded-tr-[8px] rounded-br-[8px] px-[8px] py-[4px] text-[12px] font-[400] me-[12px] whitespace-nowrap cursor-pointer flex justify-center items-center'} onClick={()=>sendAskAIDefault()}>{'⏎ AskAI'}</div>
-                    <SearchBar cards={cards} popupPrompt={popupPrompt} isVisible={visible ?? false}
+                    <SearchBar cards={askCards.slice(0, slots(PromptScenarios.ASK))} popupPrompt={popupPrompt} isVisible={visible ?? false}
                         onOpenChange={(visibleAskPop) => {
                             Logger.log(`visibleAskPop=================${visibleAskPop}`);
                             if (visibleAskPop) {

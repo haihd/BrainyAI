@@ -32,10 +32,12 @@ import ArrowLDeepIcon from "data-base64:~assets/arrow_l_deep.png";
 import ArrowRDeepIcon from "data-base64:~assets/arrow_r_deep.png";
 import ChatInputCloseIcon from "data-base64:~assets/icon_chat_input_close.svg";
 import {useStorage} from "@plasmohq/storage/dist/hook";
-import {AskPromptData, AskPromptId, ImagePromptDatas, PdfPromptDatas, PromptDatas} from "~options/constant/PromptDatas";
+import {AskPromptData, AskPromptId, ImagePromptDatas, PdfPromptDatas} from "~options/constant/PromptDatas";
 import {getIconSrc} from "~options/component/AiEnginePage";
 import {PromptTypes} from "~options/constant/PromptTypes";
 import {getGrayImageSrc, getImageBlueSrc, getImageSrc} from "~options/component/Card";
+import {usePromptLibrary} from "~utils/prompt-cards";
+import {PromptScenarios} from "~options/constant/PromptScenarios";
 import TriangleIcon from "data-base64:~assets/icon_triangle.svg";
 import SendMsgIcon from "data-base64:~assets/icon_chat_send_msg.svg";
 import {QuotingType} from "~sidepanel/constant/QuotingType";
@@ -574,7 +576,7 @@ export const AIMessage = memo(({message, i}: {
         });
 
         window.addEventListener('mousedown', (e: MouseEvent) => {
-            if (e.target !== switchRef.current && !popoverRef.current!.contains(e.target as Node) ) {
+            if (e.target !== switchRef.current && !popoverRef.current?.contains(e.target as Node)) {
                 setPopoverOpen(false);
             }
         });
@@ -930,7 +932,9 @@ function ConversationContent() {
     const {setMessages} = useContext(ConversationContext);
     const ref = React.useRef<TextAreaRef>(null);
     const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
-    const [cards] = useStorage('promptData', PromptDatas);
+    // The side panel offers the Chat/Ask prompts, in the order set in the Prompt Manager
+    const {shown: shownPrompts, cards: allPrompts} = usePromptLibrary();
+    const cards = shownPrompts(PromptScenarios.ASK);
     const [pdfCards] = useStorage('pdfPromptData', PdfPromptDatas);
     const [imageCards] = useStorage('imagePromptData', ImagePromptDatas);
     const [quotingText, setQuotingText] = useState(['', '']);
@@ -1149,7 +1153,8 @@ function ConversationContent() {
             return;
         }
         if (inputText && inputText.trim()) {
-            const card = quickPrompt[0]==AskPromptId?AskPromptData:cards.find((card) => card.id === quickPrompt[0]);
+            // the prompt may come from the selection toolbar, so look it up among all prompts
+            const card = quickPrompt[0]==AskPromptId?AskPromptData:allPrompts.find((card) => card.id === quickPrompt[0]);
             if(isUploadingInfo[0] && isUploadingInfo[4].size>0){
                 goToAskEngine(inputText, card, undefined, true, [isUploadingInfo[2], isUploadingInfo[3], isUploadingInfo[4], isUploadingInfo[5], isUploadingInfo[6]]);
             }else if (isQuotShow && quotText[1]) {

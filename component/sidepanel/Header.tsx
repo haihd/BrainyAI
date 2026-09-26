@@ -7,6 +7,8 @@ import IconSearchActive from "data-base64:~assets/icon_search_ai_active.svg";
 import IconChat from "data-base64:~assets/chat.svg";
 import IconSetting from "data-base64:~assets/setting.svg";
 import IconChatActive from "data-base64:~assets/chat_active.svg";
+import IconTranslate from "data-base64:~assets/icon_translate.svg";
+import IconTranslateActive from "data-base64:~assets/icon_translate_blue.svg";
 import {PanelRouterPath} from "~libs/constants";
 import {useLocation, useNavigate} from "react-router-dom";
 import NewChatIcon from "data-base64:~assets/new_chat.svg";
@@ -23,6 +25,7 @@ export interface IDrawerNaviItem {
 
 const DrawerNaviItems: IDrawerNaviItem[] = [
     {path: PanelRouterPath.CONVERSATION, name: "Chat", icon:  IconChat, activeIcon: IconChatActive},
+    {path: PanelRouterPath.TRANSLATE, name: "Translate", icon: IconTranslate, activeIcon: IconTranslateActive},
     {path: PanelRouterPath.SEARCH_HOME, name: "Search", icon:  IconSearch, activeIcon: IconSearchActive},
 ];
 
@@ -30,6 +33,7 @@ const DrawerNaviItems: IDrawerNaviItem[] = [
 const HTitle = {
     AIChatText: "AI Chat",
     AISearchText: "AI Search",
+    AITranslateText: "AI Translate",
 };
 
 export default function () {
@@ -45,6 +49,9 @@ export default function () {
         if(location.pathname.endsWith(PanelRouterPath.CONVERSATION)) {
             setTitleImage(IconChat);
             setTitleText(HTitle.AIChatText);
+        } else if (location.pathname.endsWith(PanelRouterPath.TRANSLATE)) {
+            setTitleImage(IconTranslate);
+            setTitleText(HTitle.AITranslateText);
         } else {
             setTitleImage(IconSearch);
             setTitleText(HTitle.AISearchText);
